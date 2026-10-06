@@ -8,6 +8,7 @@
 body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1100px;margin:40px auto;padding:0 20px;line-height:1.6}
 h1{margin-bottom:6px}.sub{color:#666}.box{border:1px solid #ddd;border-radius:10px;padding:18px;margin:20px 0}
 table{border-collapse:collapse;width:100%;margin-top:12px}th,td{border-bottom:1px solid #ddd;padding:10px;text-align:left}th{background:#f6f6f6}
+th.sortable{cursor:pointer;user-select:none}.sort-arrow{font-size:.8em;margin-left:4px}
 .badge{font-weight:700}.note{color:#666;font-size:.9em}
 </style>
 </head>
@@ -16,16 +17,33 @@ table{border-collapse:collapse;width:100%;margin-top:12px}th,td{border-bottom:1p
 <div class="sub">現行基準：メインフィルター2.3.1</div>
 <div class="box">
 <strong>分析結果一覧</strong>
-<table>
-<thead><tr><th>コード</th><th>企業</th><th>分析日</th><th>スコア</th><th>STAGE1</th><th>判定</th></tr></thead>
-<tbody>
-<tr><td>9467</td><td>アルファポリス</td><td>2026-09-29</td><td>72.6</td><td>57/80</td><td class="badge">HOLD</td></tr>
-<tr><td>500A</td><td>TOブックス</td><td>2026-09-29</td><td>—</td><td>53/80</td><td class="badge">DATA-INSUFFICIENT／最大HOLD</td></tr>
-<tr><td>414A</td><td>オーバーラップ</td><td>2026-09-29</td><td>—</td><td>DATA-INSUFFICIENT</td><td class="badge">判定不能</td></tr>
+<table id="resultsTable">
+<thead><tr><th>コード</th><th>企業</th><th>分析日</th><th class="sortable" onclick="sortByScore()">スコア<span id="sortArrow" class="sort-arrow">▼</span></th><th>STAGE1</th><th>判定</th></tr></thead>
+<tbody id="resultsBody">
+<tr><td>9467</td><td>アルファポリス</td><td>2026-09-29</td><td data-score="72.6">72.6</td><td>57/80</td><td class="badge">HOLD</td></tr>
+<tr><td>500A</td><td>TOブックス</td><td>2026-09-29</td><td data-score="">—</td><td>53/80</td><td class="badge">DATA-INSUFFICIENT／最大HOLD</td></tr>
+<tr><td>414A</td><td>オーバーラップ</td><td>2026-09-29</td><td data-score="">—</td><td>DATA-INSUFFICIENT</td><td class="badge">判定不能</td></tr>
 </tbody>
 </table>
-<p class="note">数値が確認できない項目は推定せず、欠損・未確認として管理します。</p>
+<p class="note">初期表示はスコアの高い順です。「スコア」をタップすると並び順を切り替えられます。数値が確認できない項目は推定せず、欠損・未確認として管理します。</p>
 </div>
 <p><a href="index.csv">CSVデータを見る</a>　|　<a href="https://github.com/shinbaba777-prog/main-filter-results">GitHubリポジトリ</a></p>
+<script>
+let descending = true;
+function sortByScore(){
+  const body=document.getElementById("resultsBody");
+  const rows=Array.from(body.rows);
+  rows.sort((a,b)=>{
+    const as=parseFloat(a.cells[3].dataset.score);
+    const bs=parseFloat(b.cells[3].dataset.score);
+    const av=Number.isNaN(as)?-Infinity:as;
+    const bv=Number.isNaN(bs)?-Infinity:bs;
+    return descending ? bv-av : av-bv;
+  });
+  rows.forEach(row=>body.appendChild(row));
+  descending=!descending;
+  document.getElementById("sortArrow").textContent=descending?"▼":"▲";
+}
+</script>
 </body>
 </html>
