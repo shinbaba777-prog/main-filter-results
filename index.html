@@ -18,31 +18,44 @@ th.sortable{cursor:pointer;user-select:none}.sort-arrow{font-size:.8em;margin-le
 <div class="box">
 <strong>分析結果一覧</strong>
 <table id="resultsTable">
-<thead><tr><th>コード</th><th>企業</th><th>分析日</th><th class="sortable" onclick="sortByScore()">スコア<span id="sortArrow" class="sort-arrow">▼</span></th><th>STAGE1</th><th>判定</th></tr></thead>
+<thead><tr>
+<th>コード</th><th>企業</th>
+<th class="sortable" onclick="sortByDate()">分析日<span id="dateArrow" class="sort-arrow">▼</span></th>
+<th class="sortable" onclick="sortByScore()">スコア<span id="scoreArrow" class="sort-arrow"> </span></th>
+<th>STAGE1</th><th>判定</th>
+</tr></thead>
 <tbody id="resultsBody">
-<tr><td>9467</td><td>アルファポリス</td><td>2026-09-29</td><td data-score="72.6">72.6</td><td>57/80</td><td class="badge">HOLD</td></tr>
-<tr><td>500A</td><td>TOブックス</td><td>2026-09-29</td><td data-score="">—</td><td>53/80</td><td class="badge">DATA-INSUFFICIENT／最大HOLD</td></tr>
-<tr><td>414A</td><td>オーバーラップ</td><td>2026-09-29</td><td data-score="">—</td><td>DATA-INSUFFICIENT</td><td class="badge">判定不能</td></tr>
+<tr><td>9467</td><td>アルファポリス</td><td data-date="2026-09-29">2026-09-29</td><td data-score="72.6">72.6</td><td>57/80</td><td class="badge">HOLD</td></tr>
+<tr><td>500A</td><td>TOブックス</td><td data-date="2026-09-29">2026-09-29</td><td data-score="">—</td><td>53/80</td><td class="badge">DATA-INSUFFICIENT／最大HOLD</td></tr>
+<tr><td>414A</td><td>オーバーラップ</td><td data-date="2026-09-29">2026-09-29</td><td data-score="">—</td><td>DATA-INSUFFICIENT</td><td class="badge">判定不能</td></tr>
 </tbody>
 </table>
-<p class="note">初期表示はスコアの高い順です。「スコア」をタップすると並び順を切り替えられます。数値が確認できない項目は推定せず、欠損・未確認として管理します。</p>
+<p class="note">初期表示は分析日の新しい順です。「分析日」「スコア」をタップすると、それぞれ独立して昇順・降順を切り替えられます。数値が確認できない項目は推定せず、欠損・未確認として管理します。</p>
 </div>
 <p><a href="index.csv">CSVデータを見る</a>　|　<a href="https://github.com/shinbaba777-prog/main-filter-results">GitHubリポジトリ</a></p>
 <script>
-let descending = true;
-function sortByScore(){
-  const body=document.getElementById("resultsBody");
-  const rows=Array.from(body.rows);
-  rows.sort((a,b)=>{
-    const as=parseFloat(a.cells[3].dataset.score);
-    const bs=parseFloat(b.cells[3].dataset.score);
-    const av=Number.isNaN(as)?-Infinity:as;
-    const bv=Number.isNaN(bs)?-Infinity:bs;
-    return descending ? bv-av : av-bv;
+let dateDescending=true;
+let scoreDescending=true;
+function getRows(){return Array.from(document.getElementById("resultsBody").rows);}
+function sortRows(compare){const body=document.getElementById("resultsBody");getRows().sort(compare).forEach(row=>body.appendChild(row));}
+function sortByDate(){
+  sortRows((a,b)=>{
+    const ad=a.cells[2].dataset.date, bd=b.cells[2].dataset.date;
+    return dateDescending ? bd.localeCompare(ad) : ad.localeCompare(bd);
   });
-  rows.forEach(row=>body.appendChild(row));
-  descending=!descending;
-  document.getElementById("sortArrow").textContent=descending?"▼":"▲";
+  dateDescending=!dateDescending;
+  document.getElementById("dateArrow").textContent=dateDescending?"▼":"▲";
+  document.getElementById("scoreArrow").textContent=" ";
+}
+function sortByScore(){
+  sortRows((a,b)=>{
+    const as=parseFloat(a.cells[3].dataset.score), bs=parseFloat(b.cells[3].dataset.score);
+    const av=Number.isNaN(as)?-Infinity:as, bv=Number.isNaN(bs)?-Infinity:bs;
+    return scoreDescending ? bv-av : av-bv;
+  });
+  scoreDescending=!scoreDescending;
+  document.getElementById("scoreArrow").textContent=scoreDescending?"▼":"▲";
+  document.getElementById("dateArrow").textContent=" ";
 }
 </script>
 </body>
