@@ -21,7 +21,7 @@
 </head>
 <body>
 <div class="wrap">
-<header><h1>フィルター成績記録</h1><div class="count" id="countLine">読み込み中…</div></header>
+<header><h1>フィルター成績記録</h1><div class="count" id="countLine">記録 3 件　確認待ち 0 件</div></header>
 <div class="tabs"><div class="tab active" data-tab="records">記録</div><div class="tab" data-tab="summary">集計</div></div>
 <section id="records" class="panel active">
 <input id="search" class="search" placeholder="銘柄名・コードで検索（例:4019、スタメン）">
@@ -29,7 +29,11 @@
 <button class="pill active" data-filter="all">すべて</button><button class="pill" data-filter="pending">確認待ち</button><button class="pill" data-filter="holdings">保有中</button><button class="pill" data-filter="buy">BUY系</button><button class="pill" data-filter="hold">HOLD</button>
 </div>
 <div class="controls"><span id="resultCount"></span><div class="sorts"><button class="sort active" data-sort="date">並び: 新しい順</button><button class="sort" data-sort="score">スコア順</button></div></div>
-<div id="list"></div>
+<div id="list">
+<article class="card"><div class="top"><div><span class="name">アルファポリス</span><span class="code">9467</span><div><span class="status hold">HOLD</span></div></div><div class="date">2026-09-29</div></div><div class="reason">ROIC 52.8%; FY28予想非開示</div><div class="metrics"><div class="score">72.6 <small>点</small></div><div class="price">分析時 <b>—</b></div></div><div class="checks"><div class="check">3M<b>12/29〜</b></div><div class="check">6M<b>3/29〜</b></div><div class="check">12M<b>9/29〜</b></div></div></article>
+<article class="card"><div class="top"><div><span class="name">TOブックス</span><span class="code">500A</span><div><span class="status reject">DATA-INSUFFICIENT／最大HOLD</span></div></div><div class="date">2026-09-29</div></div><div class="reason">希薄化+17.2%; 今期純利益+5%以下フラグ</div><div class="metrics"><div class="score">— <small>点</small></div><div class="price">分析時 <b>—</b></div></div><div class="checks"><div class="check">3M<b>12/29〜</b></div><div class="check">6M<b>3/29〜</b></div><div class="check">12M<b>9/29〜</b></div></div></article>
+<article class="card"><div class="top"><div><span class="name">オーバーラップ</span><span class="code">414A</span><div><span class="status reject">判定不能</span></div></div><div class="date">2026-09-29</div></div><div class="reason">欠損21; 参考37/80; FY26本決算予定2026-10-15後に再判定</div><div class="metrics"><div class="score">— <small>点</small></div><div class="price">分析時 <b>—</b></div></div><div class="checks"><div class="check">3M<b>12/29〜</b></div><div class="check">6M<b>3/29〜</b></div><div class="check">12M<b>9/29〜</b></div></div></article>
+</div>
 </section>
 <section id="summary" class="panel"><div class="summary" id="summaryBox"></div></section>
 </div>
@@ -73,6 +77,8 @@ function parseCSV(t){
  });
 }
 async function load(){
+ records=parseCSV(FALLBACK_CSV);
+ render();
  try{
   const res=await fetch("index.csv?"+Date.now(),{cache:"no-store"});
   if(!res.ok)throw new Error("HTTP "+res.status);
