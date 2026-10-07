@@ -26,7 +26,7 @@ h1{font-size:30px;margin:8px 0 12px}
 .code,.date{color:#778095;font-size:12px;margin-left:8px}
 .status{display:inline-block;margin-top:8px;padding:5px 9px;border-radius:7px;font-size:12px;font-weight:800;background:#fff6df;color:#9a6b00}
 .status.gray{background:#f2f4f7;color:#4d5668}
-.reason{font-size:12px;color:#606a7b;margin-top:8px;line-height:1.55}.earnings{font-size:12px;color:#172033;margin-top:10px;font-weight:800}.earnings span{font-weight:600;color:#606a7b}
+.reason{font-size:12px;color:#606a7b;margin-top:8px;line-height:1.55}.earnings{font-size:12px;color:#172033;margin-top:10px;font-weight:800}.earnings span{font-weight:600;color:#606a7b}.earnings-alert{display:inline-block;margin-left:7px;padding:2px 6px;border-radius:999px;font-size:10px;font-weight:800;background:#fff0f0;color:#b42318}.earnings-soon{background:#fff7df;color:#9a6700}
 .score{font-size:27px;font-weight:900;margin-top:14px}
 .score small{font-size:13px}
 .summary{display:none;background:#fff;border:1px solid #e7eaf0;border-radius:14px;padding:16px;margin-top:10px}
@@ -56,23 +56,24 @@ h1{font-size:30px;margin:8px 0 12px}
 <div class="sorts">
 <button class="sort active" data-sort="date" type="button">日付の新しい順</button>
 <button class="sort" data-sort="score" type="button">スコアの高い順</button>
+<button class="sort" data-sort="earnings" type="button">次回決算が近い順</button>
 </div>
 </div>
 
 <section id="cards">
-<article class="card" data-name="アルファポリス" data-code="9467" data-date="2026-09-29" data-score="72.6" data-status="holding" data-pending="false">
+<article class="card" data-name="アルファポリス" data-code="9467" data-date="2026-09-29" data-score="72.6" data-status="holding" data-pending="false" data-earnings="2026-11-13">
 <div class="top"><div><span class="name">アルファポリス</span><span class="code">9467</span><br><span class="status">HOLD</span></div><span class="date">2026-09-29</span></div>
-<div class="reason">ROIC 52.8%; FY28予想非開示</div><div class="earnings">次回決算：<span>2026/11/13予定</span></div><div class="score">72.6 <small>点</small></div>
+<div class="reason">ROIC 52.8%; FY28予想非開示</div><div class="earnings">次回決算：<span>2026/11/13予定</span><span class="earnings-days"></span></div><div class="score">72.6 <small>点</small></div>
 </article>
 
-<article class="card" data-name="TOブックス" data-code="500A" data-date="2026-09-29" data-score="" data-status="pending" data-pending="true">
+<article class="card" data-name="TOブックス" data-code="500A" data-date="2026-09-29" data-score="" data-status="pending" data-pending="true" data-earnings="">
 <div class="top"><div><span class="name">TOブックス</span><span class="code">500A</span><br><span class="status gray">DATA-INSUFFICIENT／最大HOLD</span></div><span class="date">2026-09-29</span></div>
-<div class="reason">希薄化+17.2%; 今期純利益+5%以下フラグ</div><div class="earnings">次回決算：<span>2026年12月中旬予定</span></div><div class="score">— <small>点</small></div>
+<div class="reason">希薄化+17.2%; 今期純利益+5%以下フラグ</div><div class="earnings">次回決算：<span>2026年12月中旬予定</span><span class="earnings-days"></span></div><div class="score">— <small>点</small></div>
 </article>
 
-<article class="card" data-name="オーバーラップ" data-code="414A" data-date="2026-09-29" data-score="" data-status="pending" data-pending="true">
+<article class="card" data-name="オーバーラップ" data-code="414A" data-date="2026-09-29" data-score="" data-status="pending" data-pending="true" data-earnings="2026-10-15">
 <div class="top"><div><span class="name">オーバーラップ</span><span class="code">414A</span><br><span class="status gray">判定不能</span></div><span class="date">2026-09-29</span></div>
-<div class="reason">欠損21; 参考37/80; FY26本決算予定2026-10-15後に再判定</div><div class="earnings">次回決算：<span>2026/10/15予定</span></div><div class="score">— <small>点</small></div>
+<div class="reason">欠損21; 参考37/80; FY26本決算予定2026-10-15後に再判定</div><div class="earnings">次回決算：<span>2026/10/15予定</span><span class="earnings-days"></span></div><div class="score">— <small>点</small></div>
 </article>
 </section>
 <div class="empty" id="empty">該当する記録はありません。</div>
@@ -94,6 +95,25 @@ h1{font-size:30px;margin:8px 0 12px}
   var currentFilter="all";
   var currentSort="date";
 
+  function updateEarnings(){
+    var today=new Date();
+    today.setHours(0,0,0,0);
+    cards.forEach(function(card){
+      var date=card.getAttribute("data-earnings");
+      var box=card.querySelector(".earnings-days");
+      if(!box) return;
+      box.textContent="";
+      box.className="earnings-days";
+      if(!date) return;
+      var d=new Date(date+"T00:00:00");
+      var days=Math.ceil((d-today)/86400000);
+      if(days<0){box.textContent="（決算済み）"; return;}
+      box.textContent="（あと"+days+"日）";
+      if(days<=7) box.className="earnings-days earnings-alert";
+      else if(days<=30) box.className="earnings-days earnings-alert earnings-soon";
+    });
+  }
+
   function update(){
     var q=search.value.trim().toLowerCase();
     var visible=[];
@@ -107,6 +127,13 @@ h1{font-size:30px;margin:8px 0 12px}
     });
 
     visible.sort(function(a,b){
+      if(currentSort==="earnings"){
+        var ae=a.getAttribute("data-earnings"), be=b.getAttribute("data-earnings");
+        if(!ae&& !be) return 0;
+        if(!ae) return 1;
+        if(!be) return -1;
+        return ae.localeCompare(be);
+      }
       if(currentSort==="score"){
         var as=parseFloat(a.getAttribute("data-score")), bs=parseFloat(b.getAttribute("data-score"));
         if(isNaN(as)&&isNaN(bs)) return 0;
@@ -121,6 +148,7 @@ h1{font-size:30px;margin:8px 0 12px}
     var pendingCount=cards.filter(function(c){return c.getAttribute("data-pending")==="true";}).length;
     count.textContent="記録 "+cards.length+" 件　確認待ち "+pendingCount+" 件";
     updateSummary();
+    updateEarnings();
   }
 
   function updateSummary(){
@@ -153,6 +181,7 @@ h1{font-size:30px;margin:8px 0 12px}
     updateSummary();
   });
   update();
+  updateEarnings();
 })();
 </script>
 </body>
