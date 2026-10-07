@@ -36,7 +36,7 @@
 <script>
 let records=[],filter="all",sortMode="dateDesc";
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
-function esc(s){return String(s??"").replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[m]})}
+function esc(s){return String(s??"").replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]})}
 function addMonths(date,n){const d=new Date(date+"T00:00:00");d.setMonth(d.getMonth()+n);return d}
 function md(d){return (d.getMonth()+1)+"/"+d.getDate()+"〜"}
 function statusClass(j){if((j||"").includes("BUY"))return (j||"").includes("条件付き")?"cond":"buy";if((j||"").includes("HOLD"))return"hold";if((j||"").includes("見送り")||((j||"").includes("DATA-INSUFFICIENT")))return"reject";return""}
