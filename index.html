@@ -1,1 +1,159 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>フィルター成績記録</title><style>body{margin:0;background:#f5f7fb;color:#172033;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}.wrap{max-width:900px;margin:auto;padding:24px 16px}.count{color:#778095;font-size:13px}.tabs{margin:20px 0;border-bottom:1px solid #e7eaf0;padding-bottom:10px;font-weight:700}.card{background:#fff;border:1px solid #e7eaf0;border-radius:14px;padding:16px;margin:10px 0}.top{display:flex;justify-content:space-between}.name{font-weight:800;font-size:16px}.code,.date{color:#778095;font-size:12px;margin-left:8px}.status{display:inline-block;margin-top:8px;padding:5px 9px;border-radius:7px;font-size:12px;font-weight:800;background:#fff6df;color:#9a6b00}.status.gray{background:#f2f4f7;color:#4d5668}.reason{font-size:12px;color:#606a7b;margin-top:8px}.score{font-size:27px;font-weight:900;margin-top:14px}</style></head><body><main class="wrap"><h1>フィルター成績記録</h1><div class="count">記録 3 件　確認待ち 0 件</div><div class="tabs">記録　　集計</div><article class="card"><div class="top"><div><span class="name">アルファポリス</span><span class="code">9467</span><br><span class="status">HOLD</span></div><span class="date">2026-09-29</span></div><div class="reason">ROIC 52.8%; FY28予想非開示</div><div class="score">72.6 <small>点</small></div></article><article class="card"><div class="top"><div><span class="name">TOブックス</span><span class="code">500A</span><br><span class="status gray">DATA-INSUFFICIENT／最大HOLD</span></div><span class="date">2026-09-29</span></div><div class="reason">希薄化+17.2%; 今期純利益+5%以下フラグ</div><div class="score">— <small>点</small></div></article><article class="card"><div class="top"><div><span class="name">オーバーラップ</span><span class="code">414A</span><br><span class="status gray">判定不能</span></div><span class="date">2026-09-29</span></div><div class="reason">欠損21; 参考37/80; FY26本決算予定2026-10-15後に再判定</div><div class="score">— <small>点</small></div></article></main></body></html>
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>フィルター成績記録</title>
+<style>
+body{margin:0;background:#f5f7fb;color:#172033;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}
+.wrap{max-width:900px;margin:auto;padding:24px 16px}
+h1{font-size:30px;margin:8px 0 12px}
+.count{color:#778095;font-size:13px;margin-bottom:18px}
+.tabs{display:flex;gap:28px;border-bottom:1px solid #e7eaf0;margin-bottom:14px}
+.tab{border:0;background:none;padding:0 0 12px;font:inherit;font-weight:800;color:#778095;cursor:pointer}
+.tab.active{color:#172033;border-bottom:3px solid #172033}
+.controls{display:grid;gap:10px;margin-bottom:14px}
+.search{width:100%;box-sizing:border-box;border:1px solid #dfe3ea;border-radius:10px;padding:12px 13px;background:#fff;font-size:14px}
+.pills{display:flex;gap:7px;flex-wrap:wrap}
+.pill{border:1px solid #dfe3ea;background:#fff;color:#4d5668;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer}
+.pill.active{background:#172033;color:#fff;border-color:#172033}
+.sorts{display:flex;gap:7px;flex-wrap:wrap}
+.sort{border:1px solid #dfe3ea;background:#fff;color:#4d5668;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer}
+.sort.active{background:#eef1f6;color:#172033;border-color:#cbd2de}
+.card{background:#fff;border:1px solid #e7eaf0;border-radius:14px;padding:16px;margin:10px 0}
+.top{display:flex;justify-content:space-between;gap:10px}
+.name{font-weight:800;font-size:16px}
+.code,.date{color:#778095;font-size:12px;margin-left:8px}
+.status{display:inline-block;margin-top:8px;padding:5px 9px;border-radius:7px;font-size:12px;font-weight:800;background:#fff6df;color:#9a6b00}
+.status.gray{background:#f2f4f7;color:#4d5668}
+.reason{font-size:12px;color:#606a7b;margin-top:8px;line-height:1.55}
+.score{font-size:27px;font-weight:900;margin-top:14px}
+.score small{font-size:13px}
+.summary{display:none;background:#fff;border:1px solid #e7eaf0;border-radius:14px;padding:16px;margin-top:10px}
+.summary.show{display:block}
+.empty{display:none;text-align:center;color:#778095;padding:30px 10px}
+@media(max-width:520px){h1{font-size:29px}.wrap{padding:22px 14px}.top{align-items:flex-start}.date{white-space:nowrap}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<h1>フィルター成績記録</h1>
+<div class="count" id="count">記録 3 件　確認待ち 0 件</div>
+
+<div class="tabs">
+<button class="tab active" id="recordsTab" type="button">記録</button>
+<button class="tab" id="summaryTab" type="button">集計</button>
+</div>
+
+<section id="recordsView">
+<div class="controls">
+<input class="search" id="search" type="search" placeholder="銘柄名・コードで検索（例:4019、スタメン）">
+<div class="pills">
+<button class="pill active" data-filter="all" type="button">すべて</button>
+<button class="pill" data-filter="pending" type="button">確認待ち</button>
+<button class="pill" data-filter="holding" type="button">保有中</button>
+</div>
+<div class="sorts">
+<button class="sort active" data-sort="date" type="button">日付の新しい順</button>
+<button class="sort" data-sort="score" type="button">スコアの高い順</button>
+</div>
+</div>
+
+<section id="cards">
+<article class="card" data-name="アルファポリス" data-code="9467" data-date="2026-09-29" data-score="72.6" data-status="holding" data-pending="false">
+<div class="top"><div><span class="name">アルファポリス</span><span class="code">9467</span><br><span class="status">HOLD</span></div><span class="date">2026-09-29</span></div>
+<div class="reason">ROIC 52.8%; FY28予想非開示</div><div class="score">72.6 <small>点</small></div>
+</article>
+
+<article class="card" data-name="TOブックス" data-code="500A" data-date="2026-09-29" data-score="" data-status="pending" data-pending="true">
+<div class="top"><div><span class="name">TOブックス</span><span class="code">500A</span><br><span class="status gray">DATA-INSUFFICIENT／最大HOLD</span></div><span class="date">2026-09-29</span></div>
+<div class="reason">希薄化+17.2%; 今期純利益+5%以下フラグ</div><div class="score">— <small>点</small></div>
+</article>
+
+<article class="card" data-name="オーバーラップ" data-code="414A" data-date="2026-09-29" data-score="" data-status="pending" data-pending="true">
+<div class="top"><div><span class="name">オーバーラップ</span><span class="code">414A</span><br><span class="status gray">判定不能</span></div><span class="date">2026-09-29</span></div>
+<div class="reason">欠損21; 参考37/80; FY26本決算予定2026-10-15後に再判定</div><div class="score">— <small>点</small></div>
+</article>
+</section>
+<div class="empty" id="empty">該当する記録はありません。</div>
+</section>
+
+<section class="summary" id="summaryView">
+<strong>集計</strong>
+<div id="summaryText" style="margin-top:10px;color:#606a7b;font-size:13px;line-height:1.8"></div>
+</section>
+</main>
+
+<script>
+(function(){
+  var cardsBox=document.getElementById("cards");
+  var cards=Array.prototype.slice.call(cardsBox.querySelectorAll(".card"));
+  var search=document.getElementById("search");
+  var count=document.getElementById("count");
+  var empty=document.getElementById("empty");
+  var currentFilter="all";
+  var currentSort="date";
+
+  function update(){
+    var q=search.value.trim().toLowerCase();
+    var visible=[];
+    cards.forEach(function(card){
+      var text=(card.getAttribute("data-name")+" "+card.getAttribute("data-code")).toLowerCase();
+      var matchesSearch=!q||text.indexOf(q)>=0;
+      var pending=card.getAttribute("data-pending")==="true";
+      var matchesFilter=currentFilter==="all"||(currentFilter==="pending"&&pending)||(currentFilter==="holding"&&!pending);
+      card.style.display=(matchesSearch&&matchesFilter)?"":"none";
+      if(matchesSearch&&matchesFilter) visible.push(card);
+    });
+
+    visible.sort(function(a,b){
+      if(currentSort==="score"){
+        var as=parseFloat(a.getAttribute("data-score")), bs=parseFloat(b.getAttribute("data-score"));
+        if(isNaN(as)&&isNaN(bs)) return 0;
+        if(isNaN(as)) return 1;
+        if(isNaN(bs)) return -1;
+        return bs-as;
+      }
+      return b.getAttribute("data-date").localeCompare(a.getAttribute("data-date"));
+    });
+    visible.forEach(function(card){cardsBox.appendChild(card);});
+    empty.style.display=visible.length?"none":"block";
+    var pendingCount=cards.filter(function(c){return c.getAttribute("data-pending")==="true";}).length;
+    count.textContent="記録 "+cards.length+" 件　確認待ち "+pendingCount+" 件";
+    updateSummary();
+  }
+
+  function updateSummary(){
+    var scored=cards.map(function(c){return parseFloat(c.getAttribute("data-score"));}).filter(function(n){return !isNaN(n);});
+    var avg=scored.length?Math.round(scored.reduce(function(a,b){return a+b;},0)/scored.length*10)/10:"—";
+    document.getElementById("summaryText").textContent="総記録 "+cards.length+" 件 ／ スコア確認済み "+scored.length+" 件 ／ 平均スコア "+avg+" 点";
+  }
+
+  search.addEventListener("input",update);
+  Array.prototype.forEach.call(document.querySelectorAll(".pill"),function(btn){
+    btn.addEventListener("click",function(){
+      Array.prototype.forEach.call(document.querySelectorAll(".pill"),function(x){x.classList.remove("active");});
+      btn.classList.add("active"); currentFilter=btn.getAttribute("data-filter"); update();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".sort"),function(btn){
+    btn.addEventListener("click",function(){
+      Array.prototype.forEach.call(document.querySelectorAll(".sort"),function(x){x.classList.remove("active");});
+      btn.classList.add("active"); currentSort=btn.getAttribute("data-sort"); update();
+    });
+  });
+
+  document.getElementById("recordsTab").addEventListener("click",function(){
+    this.classList.add("active"); document.getElementById("summaryTab").classList.remove("active");
+    document.getElementById("recordsView").style.display="block"; document.getElementById("summaryView").classList.remove("show");
+  });
+  document.getElementById("summaryTab").addEventListener("click",function(){
+    this.classList.add("active"); document.getElementById("recordsTab").classList.remove("active");
+    document.getElementById("recordsView").style.display="none"; document.getElementById("summaryView").classList.add("show");
+    updateSummary();
+  });
+  update();
+})();
+</script>
+</body>
+</html>
