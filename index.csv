@@ -1,4 +1,4 @@
-code,company,analysis_date,filter_version,score,stage1,judgment,notes
-9467,アルファポリス,2026-09-29,2.3.1,72.6,57/80,HOLD,"ROIC 52.8%; FY28予想非開示"
-500A,TOブックス,2026-09-29,2.3.1,,53/80,DATA-INSUFFICIENT／最大HOLD,"希薄化+17.2%; 今期純利益+5%以下フラグ"
-414A,オーバーラップ,2026-09-29,2.3.1,,DATA-INSUFFICIENT,判定不能,"欠損21; 参考37/80; FY26本決算予定2026-10-15後に再判定"
+code,company,analysis_date,filter_version,score,stage1,judgment,notes,earnings_date,earnings_text,holding
+9467,アルファポリス,2026-09-29,2.3.1,72.6,57/80,HOLD,"ROIC 52.8%; FY28予想非開示",2026-11-13,2026/11/13予定,false
+500A,TOブックス,2026-09-29,2.3.1,,53/80,DATA-INSUFFICIENT／最大HOLD,"希薄化+17.2%; 今期純利益+5%以下フラグ",,2026年12月中旬予定,false
+414A,オーバーラップ,2026-09-29,2.3.1,,DATA-INSUFFICIENT,判定不能,"欠損21; 参考37/80; FY26本決算予定2026-10-15後に再判定",2026-10-15,2026/10/15予定,false
