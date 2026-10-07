@@ -62,7 +62,7 @@ function render(){
 async function load(){
  try{
   const t=await fetch("index.csv?"+Date.now()).then(function(r){return r.text()});
-  const rows=t.trim().split(/\\r?\\n/),heads=rows.shift().split(",");
+  const rows=t.trim().split(/\r?\n/),heads=rows.shift().split(",");
   records=rows.map(function(line){
    const vals=[],cur=[];let q=false,s="";
    for(const c of line){if(c==='"')q=!q;else if(c===','&&!q){vals.push(s);s=""}else s+=c}vals.push(s);
