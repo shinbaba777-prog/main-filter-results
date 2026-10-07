@@ -1,62 +1,79 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>日本株メインフィルター分析結果</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>フィルター成績記録</title>
 <style>
-body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1100px;margin:40px auto;padding:0 20px;line-height:1.6}
-h1{margin-bottom:6px}.sub{color:#666}.box{border:1px solid #ddd;border-radius:10px;padding:18px;margin:20px 0}
-table{border-collapse:collapse;width:100%;margin-top:12px}th,td{border-bottom:1px solid #ddd;padding:10px;text-align:left}th{background:#f6f6f6}
-th.sortable{cursor:pointer;user-select:none}.sort-arrow{font-size:.8em;margin-left:4px}
-.badge{font-weight:700}.note{color:#666;font-size:.9em}
+:root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#778095;--line:#e7eaf0;--green:#16834b;--yellow:#9a6b00;--red:#c93636}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:24px 16px 48px}header{padding:8px 2px 18px}h1{font-size:25px;margin:0 0 6px}.count{font-size:13px;color:var(--muted)}
+.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-bottom:14px}.tab{padding:10px 2px 11px;color:var(--muted);font-weight:700;font-size:14px;cursor:pointer;border-bottom:2px solid transparent}.tab.active{color:var(--text);border-bottom-color:var(--text)}
+.search{width:100%;height:44px;border:1px solid var(--line);border-radius:11px;background:#fff;padding:0 14px;font-size:14px;outline:none;margin-bottom:10px}.search:focus{border-color:#aebbf4}
+.pills{display:flex;gap:7px;overflow:auto;padding-bottom:8px}.pill{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 12px;font-size:12px;color:#596274;cursor:pointer}.pill.active{background:#eef2ff;border-color:#cbd5ff;color:#2746c7;font-weight:700}
+.controls{display:flex;justify-content:space-between;align-items:center;margin:8px 0 13px;font-size:12px;color:var(--muted)}.sorts{display:flex;gap:6px}.sort{border:0;background:transparent;color:#596274;cursor:pointer;font-size:12px;padding:4px}.sort.active{font-weight:800;color:var(--text)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:10px 0;box-shadow:0 1px 2px rgba(20,30,50,.03)}
+.top{display:flex;justify-content:space-between;gap:12px}.name{font-weight:800;font-size:16px}.code{font-size:12px;color:var(--muted);margin-left:7px}.date{font-size:12px;color:var(--muted);white-space:nowrap}
+.status{display:inline-block;margin-top:8px;padding:5px 9px;border-radius:7px;font-size:12px;font-weight:800;background:#f2f4f7;color:#4d5668}.status.buy{background:#eaf8f0;color:var(--green)}.status.cond{background:#eef3ff;color:#3155c9}.status.hold{background:#fff6df;color:var(--yellow)}.status.reject{background:#fff0f0;color:var(--red)}
+.reason{font-size:12px;color:#606a7b;margin-top:8px;line-height:1.5}.metrics{display:flex;align-items:end;gap:18px;margin-top:14px}.score{font-size:27px;font-weight:900;line-height:1}.score small{font-size:11px;font-weight:600;color:var(--muted)}.price{font-size:12px;color:#606a7b}.price b{color:var(--text);font-size:14px}.checks{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.check{font-size:11px;color:var(--muted)}.check b{display:block;color:#4f596b;margin-top:2px;font-size:12px}.empty{text-align:center;padding:45px 10px;color:var(--muted)}
+.panel{display:none}.panel.active{display:block}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}.stat b{display:block;font-size:22px}.stat span{font-size:11px;color:var(--muted)}
+@media(max-width:560px){.wrap{padding:18px 12px 40px}.top{align-items:flex-start}.date{font-size:11px}.checks{gap:5px}.metrics{gap:14px}}
 </style>
 </head>
 <body>
-<h1>日本株メインフィルター分析結果</h1>
-<div class="sub">現行基準：メインフィルター2.3.1</div>
-<div class="box">
-<strong>分析結果一覧</strong>
-<table id="resultsTable">
-<thead><tr>
-<th>コード</th><th>企業</th>
-<th class="sortable" onclick="sortByDate()">分析日<span id="dateArrow" class="sort-arrow">▼</span></th>
-<th class="sortable" onclick="sortByScore()">スコア<span id="scoreArrow" class="sort-arrow"> </span></th>
-<th>STAGE1</th><th>判定</th>
-</tr></thead>
-<tbody id="resultsBody">
-<tr><td>9467</td><td>アルファポリス</td><td data-date="2026-09-29">2026-09-29</td><td data-score="72.6">72.6</td><td>57/80</td><td class="badge">HOLD</td></tr>
-<tr><td>500A</td><td>TOブックス</td><td data-date="2026-09-29">2026-09-29</td><td data-score="">—</td><td>53/80</td><td class="badge">DATA-INSUFFICIENT／最大HOLD</td></tr>
-<tr><td>414A</td><td>オーバーラップ</td><td data-date="2026-09-29">2026-09-29</td><td data-score="">—</td><td>DATA-INSUFFICIENT</td><td class="badge">判定不能</td></tr>
-</tbody>
-</table>
-<p class="note">初期表示は分析日の新しい順です。「分析日」「スコア」をタップすると、それぞれ独立して昇順・降順を切り替えられます。数値が確認できない項目は推定せず、欠損・未確認として管理します。</p>
+<div class="wrap">
+<header><h1>フィルター成績記録</h1><div class="count" id="countLine">読み込み中…</div></header>
+<div class="tabs"><div class="tab active" data-tab="records">記録</div><div class="tab" data-tab="summary">集計</div></div>
+<section id="records" class="panel active">
+<input id="search" class="search" placeholder="銘柄名・コードで検索（例:4019、スタメン）">
+<div class="pills">
+<button class="pill active" data-filter="all">すべて</button><button class="pill" data-filter="pending">確認待ち</button><button class="pill" data-filter="holdings">保有中</button><button class="pill" data-filter="buy">BUY系</button><button class="pill" data-filter="hold">HOLD</button>
 </div>
-<p><a href="index.csv">CSVデータを見る</a>　|　<a href="https://github.com/shinbaba777-prog/main-filter-results">GitHubリポジトリ</a></p>
+<div class="controls"><span id="resultCount"></span><div class="sorts"><button class="sort active" data-sort="date">並び: 新しい順</button><button class="sort" data-sort="score">スコア順</button></div></div>
+<div id="list"></div>
+</section>
+<section id="summary" class="panel"><div class="summary" id="summaryBox"></div></section>
+</div>
 <script>
-let dateDescending=true;
-let scoreDescending=true;
-function getRows(){return Array.from(document.getElementById("resultsBody").rows);}
-function sortRows(compare){const body=document.getElementById("resultsBody");getRows().sort(compare).forEach(row=>body.appendChild(row));}
-function sortByDate(){
-  sortRows((a,b)=>{
-    const ad=a.cells[2].dataset.date, bd=b.cells[2].dataset.date;
-    return dateDescending ? bd.localeCompare(ad) : ad.localeCompare(bd);
-  });
-  dateDescending=!dateDescending;
-  document.getElementById("dateArrow").textContent=dateDescending?"▼":"▲";
-  document.getElementById("scoreArrow").textContent=" ";
+let records=[],filter="all",sortMode="dateDesc";
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+function esc(s){return String(s??"").replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[m]})}
+function addMonths(date,n){const d=new Date(date+"T00:00:00");d.setMonth(d.getMonth()+n);return d}
+function md(d){return (d.getMonth()+1)+"/"+d.getDate()+"〜"}
+function statusClass(j){if((j||"").includes("BUY"))return (j||"").includes("条件付き")?"cond":"buy";if((j||"").includes("HOLD"))return"hold";if((j||"").includes("見送り")||((j||"").includes("DATA-INSUFFICIENT")))return"reject";return""}
+function card(r){
+ const score=Number(r.score),j=r.judgment||"判定未確認",cls=statusClass(j);
+ const checks=r.analysis_date?'<div class="checks"><div class="check">3M<b>'+md(addMonths(r.analysis_date,3))+'</b></div><div class="check">6M<b>'+md(addMonths(r.analysis_date,6))+'</b></div><div class="check">12M<b>'+md(addMonths(r.analysis_date,12))+'</b></div></div>':"";
+ return '<article class="card"><div class="top"><div><span class="name">'+esc(r.company)+'</span><span class="code">'+esc(r.code)+'</span><div><span class="status '+cls+'">'+esc(j)+'</span></div></div><div class="date">'+esc(r.analysis_date)+'</div></div><div class="reason">'+esc(r.notes||"")+'</div><div class="metrics"><div class="score">'+(Number.isFinite(score)?score:"—")+' <small>点</small></div><div class="price">分析時 <b>'+(r.analysis_price?esc(r.analysis_price):"—")+'</b></div></div>'+checks+'</article>';
 }
-function sortByScore(){
-  sortRows((a,b)=>{
-    const as=parseFloat(a.cells[3].dataset.score), bs=parseFloat(b.cells[3].dataset.score);
-    const av=Number.isNaN(as)?-Infinity:as, bv=Number.isNaN(bs)?-Infinity:bs;
-    return scoreDescending ? bv-av : av-bv;
-  });
-  scoreDescending=!scoreDescending;
-  document.getElementById("scoreArrow").textContent=scoreDescending?"▼":"▲";
-  document.getElementById("dateArrow").textContent=" ";
+function render(){
+ const q=$("#search").value.trim().toLowerCase();
+ let a=records.filter(function(r){
+   const match=!q||(r.code+" "+r.company).toLowerCase().includes(q);
+   let f=filter==="all"||(filter==="pending"&&(r.judgment||"").includes("確認待ち"))||(filter==="holdings"&&r.holding==="1")||(filter==="buy"&&(r.judgment||"").includes("BUY"))||(filter==="hold"&&(r.judgment||"").includes("HOLD"));
+   return match&&f;
+ });
+ a.sort(function(x,y){if(sortMode==="scoreDesc")return (Number(y.score)||-Infinity)-(Number(x.score)||-Infinity);return String(y.analysis_date).localeCompare(String(x.analysis_date))});
+ $("#resultCount").textContent=a.length+"件";
+ $("#list").innerHTML=a.length?a.map(card).join(""):'<div class="empty">該当する記録がありません</div>';
+ const scores=records.map(function(r){return Number(r.score)}).filter(Number.isFinite);
+ $("#countLine").textContent="記録 "+records.length+" 件　確認待ち "+records.filter(function(r){return (r.judgment||"").includes("確認待ち")}).length+" 件";
+ $("#summaryBox").innerHTML=[["総記録",records.length],["80点以上",scores.filter(function(x){return x>=80}).length],["平均スコア",scores.length?(scores.reduce(function(a,b){return a+b},0)/scores.length).toFixed(1):"—"]].map(function(x){return '<div class="stat"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'}).join("");
 }
+async function load(){
+ try{
+  const t=await fetch("index.csv?"+Date.now()).then(function(r){return r.text()});
+  const rows=t.trim().split(/\\r?\\n/),heads=rows.shift().split(",");
+  records=rows.map(function(line){
+   const vals=[],cur=[];let q=false,s="";
+   for(const c of line){if(c==='"')q=!q;else if(c===','&&!q){vals.push(s);s=""}else s+=c}vals.push(s);
+   const o={};heads.forEach(function(h,i){o[h]=vals[i]?.replace(/^"|"$/g,"")||""});return o;
+  });
+  render();
+ }catch(e){$("#countLine").textContent="データ読み込みエラー";$("#list").innerHTML='<div class="empty">index.csvを読み込めませんでした</div>'}
+}
+$$(".tab").forEach(function(x){x.onclick=function(){$$(".tab").forEach(function(y){y.classList.remove("active")});x.classList.add("active");$$(".panel").forEach(function(y){y.classList.remove("active")});$("#"+x.dataset.tab).classList.add("active")}});
+$$(".pill").forEach(function(x){x.onclick=function(){$$(".pill").forEach(function(y){y.classList.remove("active")});x.classList.add("active");filter=x.dataset.filter;render()}});
+$$(".sort").forEach(function(x){x.onclick=function(){sortMode=x.dataset.sort==="score"?"scoreDesc":"dateDesc";$$(".sort").forEach(function(y){y.classList.remove("active")});x.classList.add("active");render()}});
+$("#search").oninput=render;load();
 </script>
-</body>
-</html>
+</body></html>
