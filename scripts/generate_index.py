@@ -43,7 +43,7 @@ h1{font-size:30px;margin:8px 0 12px}.count{color:#778095;font-size:13px;margin-b
 .pills,.sorts,.pager{display:flex;gap:7px;flex-wrap:wrap}.pill,.sort,.pagebtn{border:1px solid #dfe3ea;background:#fff;color:#4d5668;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer}.pill{border-radius:999px}.pill.active,.sort.active,.pagebtn.active{background:#172033;color:#fff;border-color:#172033}.pagebtn:disabled{opacity:.45;cursor:default}
 .card{background:#fff;border:1px solid #e7eaf0;border-radius:14px;padding:16px;margin:10px 0}.top{display:flex;justify-content:space-between;gap:10px}.name{font-weight:800;font-size:16px}.code,.date{color:#778095;font-size:12px;margin-left:8px}
 .status{display:inline-block;margin-top:8px;padding:5px 9px;border-radius:7px;font-size:12px;font-weight:800;background:#fff6df;color:#9a6b00}.status.gray{background:#f2f4f7;color:#4d5668}
-.reason{font-size:12px;color:#606a7b;margin-top:8px;line-height:1.55}.meta{font-size:11px;color:#8992a2;margin-top:7px}.earnings{font-size:12px;color:#172033;margin-top:10px;font-weight:800}.earnings span{font-weight:600;color:#606a7b}.earnings-alert{display:inline-block;margin-left:7px;padding:2px 6px;border-radius:999px;font-size:10px;font-weight:800;background:#fff0f0;color:#b42318}.earnings-soon{background:#fff7df;color:#9a6700}
+.reason{font-size:12px;color:#606a7b;margin-top:8px;line-height:1.55}.meta{font-size:11px;color:#8992a2;margin-top:7px}.earnings{font-size:12px;color:#172033;margin-top:10px;font-weight:800}.earnings span{font-weight:600;color:#606a7b}.earnings-label{font-weight:900!important;color:#172033!important}.earnings strong{font-weight:900;color:#172033}.earnings-alert{display:inline-block;margin-left:7px;padding:2px 6px;border-radius:999px;font-size:10px;font-weight:800;background:#fff0f0;color:#b42318}.earnings-soon{background:#fff7df;color:#9a6700}
 .score{font-size:27px;font-weight:900;margin-top:14px}.score small{font-size:13px}.summary{display:none;background:#fff;border:1px solid #e7eaf0;border-radius:14px;padding:16px;margin-top:10px}.summary.show{display:block}.empty{text-align:center;color:#778095;padding:30px 10px;display:none}.pager{justify-content:center;margin:16px 0 6px}
 @media(max-width:520px){h1{font-size:29px}.wrap{padding:22px 14px}.top{align-items:flex-start}.date{white-space:nowrap}}
 </style>
@@ -87,7 +87,7 @@ const records = __DATA__;
   if(!r.earnings_text&&!r.earnings_date)return "";
   let extra="";
   if(r.earnings_date){const d=new Date(r.earnings_date+"T00:00:00"), t=new Date();t.setHours(0,0,0,0);const n=Math.ceil((d-t)/86400000);if(n<0)extra='<span>（決算済み）</span>';else if(n<=7)extra='<span class="earnings-alert">（あと'+n+'日）</span>';else if(n<=30)extra='<span class="earnings-alert earnings-soon">（あと'+n+'日）</span>';else extra='<span>（あと'+n+'日）</span>';}
-  return '<div class="earnings">次回決算：<span>'+esc(r.earnings_text||r.earnings_date)+'</span>'+extra+'</div>';
+  return '<div class="earnings"><span class="earnings-label">次回決算日</span>：<strong>'+esc(r.earnings_text||r.earnings_date)+'</strong>'+extra+'</div>';
  }
  function render(){
   const a=filtered(), total=a.length, max=Math.max(1,Math.ceil(total/PAGE_SIZE)); if(page>max)page=max;
