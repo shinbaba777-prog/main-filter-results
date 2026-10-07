@@ -59,17 +59,28 @@ function render(){
  $("#countLine").textContent="記録 "+records.length+" 件　確認待ち "+records.filter(function(r){return (r.judgment||"").includes("確認待ち")}).length+" 件";
  $("#summaryBox").innerHTML=[["総記録",records.length],["80点以上",scores.filter(function(x){return x>=80}).length],["平均スコア",scores.length?(scores.reduce(function(a,b){return a+b},0)/scores.length).toFixed(1):"—"]].map(function(x){return '<div class="stat"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'}).join("");
 }
+const FALLBACK_CSV=`code,company,analysis_date,filter_version,score,stage1,judgment,notes
+9467,アルファポリス,2026-09-29,2.3.1,72.6,57/80,HOLD,"ROIC 52.8%; FY28予想非開示"
+500A,TOブックス,2026-09-29,2.3.1,,53/80,DATA-INSUFFICIENT／最大HOLD,"希薄化+17.2%; 今期純利益+5%以下フラグ"
+414A,オーバーラップ,2026-09-29,2.3.1,,DATA-INSUFFICIENT,判定不能,"欠損21; 参考37/80; FY26本決算予定2026-10-15後に再判定"`;
+
+function parseCSV(t){
+ const rows=t.trim().split(/\r?\n/),heads=rows.shift().split(",");
+ return rows.map(function(line){
+  const vals=[];let q=false,s="";
+  for(const c of line){if(c==='"')q=!q;else if(c===','&&!q){vals.push(s);s="";}else s+=c}vals.push(s);
+  const o={};heads.forEach(function(h,i){o[h]=vals[i]?.replace(/^"|"$/g,"")||""});return o;
+ });
+}
 async function load(){
  try{
-  const t=await fetch("index.csv?"+Date.now()).then(function(r){return r.text()});
-  const rows=t.trim().split(/\r?\n/),heads=rows.shift().split(",");
-  records=rows.map(function(line){
-   const vals=[],cur=[];let q=false,s="";
-   for(const c of line){if(c==='"')q=!q;else if(c===','&&!q){vals.push(s);s=""}else s+=c}vals.push(s);
-   const o={};heads.forEach(function(h,i){o[h]=vals[i]?.replace(/^"|"$/g,"")||""});return o;
-  });
-  render();
- }catch(e){$("#countLine").textContent="データ読み込みエラー";$("#list").innerHTML='<div class="empty">index.csvを読み込めませんでした</div>'}
+  const res=await fetch("index.csv?"+Date.now(),{cache:"no-store"});
+  if(!res.ok)throw new Error("HTTP "+res.status);
+  records=parseCSV(await res.text());
+ }catch(e){
+  records=parseCSV(FALLBACK_CSV);
+ }
+ render();
 }
 $$(".tab").forEach(function(x){x.onclick=function(){$$(".tab").forEach(function(y){y.classList.remove("active")});x.classList.add("active");$$(".panel").forEach(function(y){y.classList.remove("active")});$("#"+x.dataset.tab).classList.add("active")}});
 $$(".pill").forEach(function(x){x.onclick=function(){$$(".pill").forEach(function(y){y.classList.remove("active")});x.classList.add("active");filter=x.dataset.filter;render()}});
