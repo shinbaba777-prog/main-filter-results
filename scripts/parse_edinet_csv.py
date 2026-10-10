@@ -34,11 +34,22 @@ METRICS = {
 CODE_RE = re.compile(r"^(\d{4,5})_")
 def clean(v):
     return (v or "").strip()
-def looks_numeric(v):
+def normalize_numeric(v):
     if not v:
-        return False
-    x = v.replace(",", "").replace("△", "-").replace("▲", "-").replace("−", "-").strip()
-    return bool(re.fullmatch(r"[-+]?\(?\d+(?:\.\d+)?\)?", x))
+        return ""
+    x = v.strip().replace("，", ",").replace(",", "")
+    x = x.replace("△", "-").replace("▲", "-").replace("−", "-").replace("－", "-")
+    x = x.replace("（", "(").replace("）", ")").replace("％", "%").replace("　", "")
+    # EDINET CSVs may contain full-width digits and accounting-style parentheses.
+    x = x.translate(str.maketrans("０１２３４５６７８９．＋", "0123456789.+"))
+    x = x.strip()
+    if x.startswith("(") and x.endswith(")"):
+        x = "-" + x[1:-1]
+    return x
+
+def looks_numeric(v):
+    x = normalize_numeric(v)
+    return bool(x and re.fullmatch(r"[-+]?\d+(?:\.\d+)?%?", x))
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--zip", default="")
@@ -77,13 +88,20 @@ def main():
                 lines = text.splitlines()
                 if not lines:
                     continue
-                sample = "\n".join(lines[:5])
-                try:
-                    dialect = csv.Sniffer().sniff(sample, delimiters=",\t;")
-                except csv.Error:
-                    dialect = csv.excel
-                reader = csv.reader(lines, dialect)
-                rows = list(reader)
+                sample = "\n".join(lines[:8])
+                # Sniffer can misidentify EDINET delimiters when the sample is sparse.
+                # Try common delimiters and select the parse with the most columns.
+                parsed_options = []
+                for delimiter in (",", "\\t", ";", "|"):
+                    try:
+                        parsed = list(csv.reader(lines, delimiter=delimiter))
+                        width = max((len(r) for r in parsed[:20]), default=0)
+                        parsed_options.append((width, parsed))
+                    except csv.Error:
+                        pass
+                rows = max(parsed_options, key=lambda item: item[0])[1] if parsed_options else list(csv.reader(lines))
+                if rows and max(len(r) for r in rows[:20]) <= 1:
+                    print(f"CSV_DIAGNOSTIC member={member!r} delimiter_parse_single_column=True sample={lines[:3]!r}")
                 if not rows:
                     continue
                 header = [clean(x) for x in rows[0]]
@@ -94,7 +112,7 @@ def main():
                     label = " | ".join([v for k, v in rec.items() if any(t in k.lower() for t in ("label", "name", "element", "concept", "項目", "科目"))])
                     if not label:
                         label = " | ".join(padded[:min(3, len(padded))])
-                    value_pairs = [(k, v) for k, v in rec.items() if looks_numeric(v)]
+                    value_pairs = [(k, normalize_numeric(v)) for k, v in rec.items() if looks_numeric(v)]
                     if not value_pairs:
                         continue
                     # Choose last numeric cell as a candidate, retaining all cells in raw output.
@@ -117,6 +135,18 @@ def main():
         fields = ["security_code","source_zip","source_csv","row_number","candidate_metric","label_or_concept","value_column","value","mapping_status","raw_row_json"]
         w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
         for r in candidates: w.writerow({k:r.get(k,"") for k in fields})
+    if source_zips and not all_rows:
+        print("EXTRACTION_DIAGNOSTIC: no numeric rows detected; inspecting CSV members and sample rows.")
+        for zp in zips:
+            if not zp.exists():
+                continue
+            with zipfile.ZipFile(zp) as zf:
+                csv_members = [n for n in zf.namelist() if n.lower().endswith(".csv") and not n.endswith("/")]
+                print(f"ZIP_DIAGNOSTIC zip={zp.name!r} csv_members={len(csv_members)} names={csv_members[:12]!r}")
+                for member in csv_members[:2]:
+                    raw = zf.read(member)
+                    preview = raw[:1200].decode("utf-8-sig", errors="replace")
+                    print(f"CSV_PREVIEW member={member!r} preview={preview[:1200]!r}")
     summary = {"generated_at_utc": datetime.now(timezone.utc).isoformat(), "source_zips": source_zips,
                "numeric_rows": len(all_rows), "candidate_metric_rows": len(candidates),
                "outputs": [str(long_path.relative_to(ROOT)), str(cand_path.relative_to(ROOT))],
