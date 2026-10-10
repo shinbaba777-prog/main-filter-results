@@ -94,8 +94,8 @@ def main() -> int:
     if not api_key:
         print("ERROR: EDINET_API_KEY is not set. Add it as a GitHub Actions repository secret.", file=sys.stderr)
         return 2
-    if not 1 <= args.days <= 30:
-        print("ERROR: --days must be between 1 and 30.", file=sys.stderr)
+    if not 1 <= args.days <= 365:
+        print("ERROR: --days must be between 1 and 365.", file=sys.stderr)
         return 2
 
     today = datetime.now(timezone.utc).date()
