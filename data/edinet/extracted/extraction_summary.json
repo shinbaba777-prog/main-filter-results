@@ -1,0 +1,13 @@
+{
+  "generated_at_utc": "2026-10-10T19:11:13.813329+00:00",
+  "source_zips": [
+    "44060_S100YGXD_xbrl_csv.zip"
+  ],
+  "numeric_rows": 0,
+  "candidate_metric_rows": 0,
+  "outputs": [
+    "data/edinet/extracted/xbrl_numeric_rows.csv",
+    "data/edinet/extracted/financial_metric_candidates.csv"
+  ],
+  "warning": "Heuristic candidate mappings only. Verify concept, period, unit, consolidation scope, and sign before investment scoring."
+}
