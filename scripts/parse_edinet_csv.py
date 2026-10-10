@@ -77,7 +77,7 @@ def main():
                 except Exception:
                     continue
                 text = None
-                for enc in ("utf-8-sig", "cp932", "utf-8"):
+                for enc in ("utf-16", "utf-16-le", "utf-8-sig", "cp932", "utf-8"):
                     try:
                         text = raw.decode(enc)
                         break
@@ -92,7 +92,7 @@ def main():
                 # Sniffer can misidentify EDINET delimiters when the sample is sparse.
                 # Try common delimiters and select the parse with the most columns.
                 parsed_options = []
-                for delimiter in (",", "\\t", ";", "|"):
+                for delimiter in ("\t", ",", ";", "|"):
                     try:
                         parsed = list(csv.reader(lines, delimiter=delimiter))
                         width = max((len(r) for r in parsed[:20]), default=0)
@@ -145,7 +145,7 @@ def main():
                 print(f"ZIP_DIAGNOSTIC zip={zp.name!r} csv_members={len(csv_members)} names={csv_members[:12]!r}")
                 for member in csv_members[:2]:
                     raw = zf.read(member)
-                    preview = raw[:1200].decode("utf-8-sig", errors="replace")
+                    preview = raw[:1200].decode("utf-16", errors="replace") if raw.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in raw[:80] else raw[:1200].decode("utf-8-sig", errors="replace")
                     print(f"CSV_PREVIEW member={member!r} preview={preview[:1200]!r}")
     summary = {"generated_at_utc": datetime.now(timezone.utc).isoformat(), "source_zips": source_zips,
                "numeric_rows": len(all_rows), "candidate_metric_rows": len(candidates),
