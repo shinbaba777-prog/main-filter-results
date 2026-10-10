@@ -1,0 +1,64 @@
+name: EDINET API data refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      securities_code:
+        description: "Optional Japanese securities code (e.g. 4406)"
+        required: false
+        default: ""
+        type: string
+      download_csv:
+        description: "Download the latest annual-report XBRL CSV ZIP for the code"
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    - cron: "35 16 * * *" # 01:35 JST daily
+
+permissions:
+  contents: write
+
+concurrency:
+  group: edinet-api-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check requests
+
+      - name: Fetch EDINET filing metadata
+        env:
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+        run: |
+          ARGS="--days 14"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.securities_code }}" ]; then
+            ARGS="$ARGS --code ${{ inputs.securities_code }}"
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.download_csv }}" = "true" ]; then
+            ARGS="$ARGS --download-csv"
+          fi
+          python scripts/fetch_edinet.py $ARGS
+
+      - name: Commit refreshed EDINET data
+        run: |
+          if git diff --quiet -- data/edinet; then
+            echo "No EDINET data changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/edinet
+          git commit -m "Refresh EDINET filing data"
+          git push
