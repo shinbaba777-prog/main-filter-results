@@ -52,7 +52,7 @@ def fetch_listing(day: date, api_key: str) -> list[dict]:
 
 def write_metadata(rows: list[dict]) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    rows.sort(key=lambda r: (r.get("submitDateTime", ""), r.get("docID", "")), reverse=True)
+    rows.sort(key=lambda r: (str(r.get("submitDateTime") or ""), str(r.get("docID") or "")), reverse=True)
     with (OUT / "documents.csv").open("w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
         writer.writeheader()
