@@ -41,12 +41,15 @@ jobs:
       - name: Fetch EDINET filing metadata
         env:
           EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+          SECURITIES_CODE: ${{ inputs.securities_code }}
+          DOWNLOAD_CSV: ${{ inputs.download_csv }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           ARGS="--days 14"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.securities_code }}" ]; then
-            ARGS="$ARGS --code ${{ inputs.securities_code }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$SECURITIES_CODE" ]; then
+            ARGS="$ARGS --code $SECURITIES_CODE"
           fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.download_csv }}" = "true" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$DOWNLOAD_CSV" = "true" ]; then
             ARGS="$ARGS --download-csv"
           fi
           python scripts/fetch_edinet.py $ARGS
