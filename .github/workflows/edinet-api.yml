@@ -46,6 +46,9 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           ARGS="--days 14"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$DOWNLOAD_CSV" = "true" ]; then
+            ARGS="--days 180"
+          fi
           if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$SECURITIES_CODE" ]; then
             ARGS="$ARGS --code $SECURITIES_CODE"
           fi
