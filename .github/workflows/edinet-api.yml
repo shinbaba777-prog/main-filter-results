@@ -57,6 +57,10 @@ jobs:
           fi
           python scripts/fetch_edinet.py $ARGS
 
+      - name: Extract XBRL CSV values for review
+        if: ${{ inputs.download_csv }}
+        run: python scripts/parse_edinet_csv.py
+
       - name: Commit refreshed EDINET data
         run: |
           if git diff --quiet -- data/edinet; then
