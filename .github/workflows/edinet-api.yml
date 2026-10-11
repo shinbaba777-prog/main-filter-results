@@ -90,23 +90,7 @@ jobs:
             rm -rf data/edinet/extracted
           fi
           if [ -f data/edinet/download_manifest.json ]; then
-            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-import json
-from pathlib import Path
-p = Path("data/edinet/download_manifest.json")
-m = json.loads(p.read_text(encoding="utf-8"))
-print("## EDINET download manifest")
-print("| Period end | Document ID | Status | Reason |")
-print("|---|---|---|---|")
-for row in m.get("periods", []):
-    print(f"| {row.get('periodEnd','')} | {row.get('docID','')} | {row.get('status','')} | {row.get('reason','')} |")
-print()
-print(f"**Overall status:** {m.get('status','unknown')}")
-if m.get("gaps"):
-    print(f"**Gaps:** {json.dumps(m['gaps'], ensure_ascii=False)}")
-if m.get("failed_scan_dates"):
-    print(f"**Failed scan dates:** {', '.join(m['failed_scan_dates'])}")
-PY
+            python -c 'import json; from pathlib import Path; m=json.loads(Path("data/edinet/download_manifest.json").read_text(encoding="utf-8")); print("## EDINET download manifest"); print("| Period end | Document ID | Status | Reason |"); print("|---|---|---|---|"); [print("| " + str(x.get("periodEnd","")) + " | " + str(x.get("docID","")) + " | " + str(x.get("status","")) + " | " + str(x.get("reason","")) + " |") for x in m.get("periods",[])]; print(); print("**Overall status:** " + str(m.get("status","unknown"))); print("**Gaps:** " + json.dumps(m.get("gaps",[]), ensure_ascii=False))' >> "$GITHUB_STEP_SUMMARY"
           fi
           git add data/edinet
           if git diff --cached --quiet; then
