@@ -181,7 +181,7 @@ def main() -> int:
         if not selected:
             print(f"ERROR: no annual-report CSV filings found for securities code {code}.", file=sys.stderr)
             return 2
-        print(f"Historical scan: {scanned} weekdays queried; {len(historical_matches)} matching records; {len(selected)} fiscal periods selected.")
+        print(f"Historical scan: {len(scan_days)} weekdays queried; {len(historical_matches)} matching records; {len(selected)} fiscal periods selected.", flush=True)
         for row in reversed(selected):
             path = download_csv_zip(row, api_key)
             print(f"Downloaded annual-report CSV ZIP: {path} (periodEnd={row.get('periodEnd')})")
