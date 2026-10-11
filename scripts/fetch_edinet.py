@@ -28,7 +28,7 @@ OUT = Path("data/edinet")
 FIELDS = [
     "docID", "submitDateTime", "edinetCode", "secCode", "filerName",
     "docDescription", "docTypeCode", "periodStart", "periodEnd", "csvFlag",
-    "legalStatus", "parentDocID", "withdrawalStatus",
+    "legalStatus", "parentDocID", "withdrawalStatus", "docInfoEditStatus",
 ]
 ANNUAL_REPORT_CODES = {"120", "130"}  # 有価証券報告書 / 訂正有価証券報告書
 CODE_RE = re.compile(r"^[0-9][0-9A-Z][0-9][0-9A-Z][0-9A-Z]?$")
@@ -49,6 +49,12 @@ class Throttle:
 THROTTLE = Throttle()
 RETRYABLE = {429, 500, 502, 503, 504}
 AUTH_ERRORS = {401, 403}
+def redact_secret(text: object, secret: str) -> str:
+    """Remove a known API key from diagnostic text before logging or persisting it."""
+    value = str(text or "")
+    return value.replace(secret, "[REDACTED]") if secret else value
+
+
 def api_error(response):
     try: body = response.json()
     except Exception: return None, ""
@@ -87,6 +93,7 @@ def api_get(path: str, params: dict, api_key: str, label: str = "EDINET request"
             print(f"{label}: network error {type(exc).__name__}; retry {attempt+1}/6 in {delay:.1f}s", flush=True)
             time.sleep(delay); continue
         body_status, message = api_error(response)
+        message = redact_secret(message, api_key)
         status = body_status if response.status_code == 200 and body_status not in (None, 200) else response.status_code
         if status == 200: return response
         last = f"HTTP {response.status_code}, API status {body_status}, message={message!r}"
@@ -118,16 +125,34 @@ def fetch_listing(day: date, api_key: str) -> list[dict]:
     return results
 
 
+def atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None:
+    """Write atomically so an interrupted workflow cannot leave partial files."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding=encoding, newline="") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_name, path)
+    finally:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
+
+
+def write_json_atomic(path: Path, payload: object) -> None:
+    atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+
+
 def write_metadata(rows: list[dict]) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     rows.sort(key=lambda r: (str(r.get("submitDateTime") or ""), str(r.get("docID") or "")), reverse=True)
-    with (OUT / "documents.csv").open("w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
-    (OUT / "documents.json").write_text(
-        json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=FIELDS, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+    atomic_write_text(OUT / "documents.csv", buffer.getvalue(), encoding="utf-8-sig")
+    write_json_atomic(OUT / "documents.json", rows)
 
 
 def download_csv_zip(row: dict, api_key: str) -> Path:
@@ -288,7 +313,7 @@ def main() -> int:
             manifest = {"requested_code": code, "requested_periods": args.history_years, "status": "incomplete",
                         "periods": [], "gaps": [], "failed_scan_dates": [d.isoformat() for d in failed_days],
                         "amendments": [], "reason": "no_original_annual_report_found"}
-            (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(OUT / "download_manifest.json", manifest)
             print(f"ERROR: no annual-report CSV filings found for securities code {code}.", file=sys.stderr)
             return 3
         print(f"Historical scan: {len(scan_days)} weekdays queried; {len(historical_matches)} matching records; {len(selected)} fiscal periods selected.", flush=True)
