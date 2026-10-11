@@ -126,21 +126,45 @@ def main() -> int:
     print(f"Recent EDINET filing records: {len(rows)}; annual-report candidates: {len(annual)}")
 
     if args.history_years:
-        # EDINET listing is date-scoped; scan weekdays and retain only the requested issuer.
+        # EDINET listing is date-scoped. Query weekdays concurrently with a small
+        # worker pool: sequential requests can take many minutes due to per-request
+        # network latency. Keep concurrency modest to avoid stressing the public API.
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         start_day = today - timedelta(days=365 * args.history_years)
+        end_day = today - timedelta(days=args.days)
+        scan_days = []
         day = start_day
-        scanned = 0
-        historical_matches = []
-        while day <= today - timedelta(days=args.days):
+        while day <= end_day:
             if day.weekday() < 5:
-                try:
-                    listing = fetch_listing(day, api_key)
-                    scanned += 1
-                    historical_matches.extend(r for r in listing if str(r.get("docTypeCode", "")) in ANNUAL_REPORT_CODES and normalize_code(r.get("secCode")) in accepted_codes and str(r.get("csvFlag", "")) == "1" and str(r.get("legalStatus", "1")) in {"1", "2"})
-                except (requests.RequestException, ValueError, RuntimeError) as exc:
-                    print(f"Warning: historical listing request failed for {day}: {type(exc).__name__}")
-                time.sleep(0.25)
+                scan_days.append(day)
             day += timedelta(days=1)
+
+        historical_matches = []
+        failed_days = []
+        def fetch_historical_day(scan_day):
+            return scan_day, fetch_listing(scan_day, api_key)
+
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            futures = {pool.submit(fetch_historical_day, scan_day): scan_day for scan_day in scan_days}
+            for future in as_completed(futures):
+                scan_day = futures[future]
+                try:
+                    _, listing = future.result()
+                    historical_matches.extend(
+                        r for r in listing
+                        if str(r.get("docTypeCode", "")) in ANNUAL_REPORT_CODES
+                        and normalize_code(r.get("secCode")) in accepted_codes
+                        and str(r.get("csvFlag", "")) == "1"
+                        and str(r.get("legalStatus", "1")) in {"1", "2"}
+                    )
+                except (requests.RequestException, ValueError, RuntimeError) as exc:
+                    failed_days.append(scan_day)
+                    print(f"Warning: historical listing request failed for {scan_day}: {type(exc).__name__}")
+
+        print(f"Historical scan: {len(scan_days) - len(failed_days)}/{len(scan_days)} weekday queries succeeded; {len(failed_days)} failed.")
+        if failed_days:
+            print("WARNING: Historical scan was incomplete; review failed dates before relying on year coverage.")
         by_period = {}
         for row in matches + historical_matches:
             period_end = str(row.get("periodEnd") or "")
