@@ -81,7 +81,12 @@ def main():
                 reasons.append("CONSOLIDATION_SCOPE_UNCLEAR")
             if period != expected_period:
                 reasons.append("PERIOD_TYPE_MISMATCH")
-            if not unit_id or not unit_label:
+            if metric == "eps":
+                # EDINET EPS facts commonly use JPYPerShares as the unit ID while the unit label is blank.
+                unit_ok = unit_id == "JPYPerShares"
+            else:
+                unit_ok = bool(unit_id and unit_label)
+            if not unit_ok:
                 reasons.append("UNIT_MISSING")
             if context.startswith("CurrentYear"):
                 year = "当期"
