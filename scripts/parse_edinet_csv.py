@@ -50,7 +50,7 @@ METRICS = {
     "roe": ["自己資本利益率", "ROE"],
     "roa": ["総資産利益率", "ROA"],
 }
-CODE_RE = re.compile(r"^(\d{4,5})_")
+CODE_RE = re.compile(r"^([0-9][0-9A-Z][0-9][0-9A-Z][0-9A-Z]?)_")
 def clean(v):
     return (v or "").strip()
 def normalize_numeric(v):
@@ -72,14 +72,26 @@ def looks_numeric(v):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--zip", default="")
+    ap.add_argument("--allow-incomplete", action="store_true", help="Allow parsing a manifest marked incomplete for diagnostics only")
     args = ap.parse_args()
-    zips = [Path(args.zip)] if args.zip else sorted(DATA.glob("*_xbrl_csv.zip"))
+    manifest_path = DATA / "download_manifest.json"
+    manifest = None
+    if not args.zip:
+        if not manifest_path.exists():
+            raise SystemExit("Missing download_manifest.json; refusing to glob old ZIP files")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("status") not in ("complete", "complete_short_history") and not args.allow_incomplete:
+            raise SystemExit("Download manifest is incomplete; extraction refused. Use --allow-incomplete for diagnostics only.")
+        zips = [DATA / item["file"] for item in manifest.get("periods", []) if item.get("status") == "downloaded" and item.get("file")]
+    else:
+        zips = [Path(args.zip)]
     if not zips:
         raise SystemExit("No *_xbrl_csv.zip files found in data/edinet")
     OUT.mkdir(parents=True, exist_ok=True)
     all_rows = []
     candidates = []
     source_zips = []
+    skipped_csv_members = []
     for zp in zips:
         if not zp.exists():
             print(f"Skip missing ZIP: {zp}")
@@ -93,7 +105,8 @@ def main():
                     continue
                 try:
                     raw = zf.read(member)
-                except Exception:
+                except Exception as exc:
+                    skipped_csv_members.append({"zip": zp.name, "member": member, "reason": "read_error:" + type(exc).__name__})
                     continue
                 text = None
                 for enc in ("utf-16", "utf-16-le", "utf-8-sig", "cp932", "utf-8"):
@@ -103,9 +116,11 @@ def main():
                     except UnicodeDecodeError:
                         pass
                 if text is None:
+                    skipped_csv_members.append({"zip": zp.name, "member": member, "reason": "decode_error"})
                     continue
                 lines = text.splitlines()
                 if not lines:
+                    skipped_csv_members.append({"zip": zp.name, "member": member, "reason": "empty_csv"})
                     continue
                 sample = "\n".join(lines[:8])
                 # Sniffer can misidentify EDINET delimiters when the sample is sparse.
@@ -180,9 +195,14 @@ def main():
                     print(f"CSV_PREVIEW member={member!r} preview={preview[:1200]!r}")
     summary = {"generated_at_utc": datetime.now(timezone.utc).isoformat(), "source_zips": source_zips,
                "numeric_rows": len(all_rows), "candidate_metric_rows": len(candidates),
+               "skipped_csv_members": skipped_csv_members,
+               "fiscal_periods": (manifest.get("periods", []) if manifest else []),
+               "amendments": (manifest.get("amendments", []) if manifest else []),
                "outputs": [str(long_path.relative_to(ROOT)), str(cand_path.relative_to(ROOT))],
                "warning": "Heuristic candidate mappings only. Verify concept, period, unit, consolidation scope, and sign before investment scoring."}
     (OUT / "extraction_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False))
+    if skipped_csv_members:
+        raise SystemExit(3)
 if __name__ == "__main__":
     main()
