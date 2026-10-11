@@ -67,11 +67,11 @@ jobs:
         run: python scripts/parse_edinet_csv.py
 
       - name: Validate candidate metadata for manual review
-        if: ${{ inputs.download_csv }}
+        if: ${{ inputs.download_csv || inputs.download_history }}
         run: python scripts/validate_edinet_candidates.py
 
       - name: Build core metric review queue
-        if: ${{ inputs.download_csv }}
+        if: ${{ inputs.download_csv || inputs.download_history }}
         run: python scripts/build_edinet_core_metric_review.py
 
       - name: Commit refreshed EDINET data
