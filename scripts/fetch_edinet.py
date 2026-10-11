@@ -144,6 +144,41 @@ def write_json_atomic(path: Path, payload: object) -> None:
     atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
 
 
+def add_months(day: date, months: int) -> date:
+    """Shift a date by calendar months, clamping the day to the target month."""
+    month_index = day.month - 1 + months
+    year = day.year + month_index // 12
+    month = month_index % 12 + 1
+    import calendar
+    return date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
+
+
+def weekday_dates(start_day: date, end_day: date) -> list[date]:
+    """Return weekdays in an inclusive date range."""
+    if end_day < start_day:
+        return []
+    days = []
+    day = start_day
+    while day <= end_day:
+        if day.weekday() < 5:
+            days.append(day)
+        day += timedelta(days=1)
+    return days
+
+
+def filter_history_rows(rows: list[dict], accepted_codes: set[str]) -> list[dict]:
+    """Keep valid annual report originals and amendments for the requested issuer."""
+    return [
+        row for row in rows
+        if str(row.get("docTypeCode", "")) in ANNUAL_REPORT_CODES
+        and normalize_code(row.get("secCode")) in accepted_codes
+        and str(row.get("csvFlag", "")) == "1"
+        and str(row.get("legalStatus", "1")) in {"1", "2"}
+        and str(row.get("withdrawalStatus", "0")) not in {"1", "2"}
+        and str(row.get("docInfoEditStatus", "1")) != "2"
+    ]
+
+
 def write_metadata(rows: list[dict]) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     rows.sort(key=lambda r: (str(r.get("submitDateTime") or ""), str(r.get("docID") or "")), reverse=True)
@@ -233,68 +268,111 @@ def main() -> int:
     print(f"Recent EDINET filing records: {len(rows)}; annual-report candidates: {len(annual)}")
 
     if args.history_years:
-        # EDINET listing is date-scoped. Query weekdays concurrently with a small
-        # worker pool: sequential requests can take many minutes due to per-request
-        # network latency. Keep concurrency modest to avoid stressing the public API.
+        # EDINET listing is date-scoped. Reuse the recent listing window to find
+        # the newest annual report, then scan only the expected filing windows for
+        # earlier fiscal years. Expand those windows if a period is missing; if
+        # periods still cannot be reconciled, fall back to the full historical scan.
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        start_day = today - timedelta(days=365 * args.history_years + 120)
         end_day = today - timedelta(days=args.days)
-        scan_days = []
-        day = start_day
-        while day <= end_day:
-            if day.weekday() < 5:
-                scan_days.append(day)
-            day += timedelta(days=1)
-
+        full_start_day = today - timedelta(days=365 * args.history_years + 120)
+        full_scan_days = weekday_dates(full_start_day, end_day)
         historical_matches = []
         failed_days = []
+        scanned_days = set()
+
         def fetch_historical_day(scan_day):
             return scan_day, fetch_listing(scan_day, api_key)
 
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            futures = {pool.submit(fetch_historical_day, scan_day): scan_day for scan_day in scan_days}
-            completed = 0
-            for future in as_completed(futures):
-                scan_day = futures[future]
-                try:
-                    _, listing = future.result()
-                    historical_matches.extend(
-                        r for r in listing
-                        if str(r.get("docTypeCode", "")) in ANNUAL_REPORT_CODES
-                        and normalize_code(r.get("secCode")) in accepted_codes
-                        and str(r.get("csvFlag", "")) == "1"
-                        and str(r.get("legalStatus", "1")) in {"1", "2"}
-                        and str(r.get("withdrawalStatus", "0")) not in {"1", "2"}
-                        and str(r.get("docInfoEditStatus", "1")) != "2"
-                    )
-                except (requests.RequestException, ValueError, RuntimeError) as exc:
-                    failed_days.append(scan_day)
-                    print(f"Warning: historical listing request failed for {scan_day}: {type(exc).__name__}")
-                completed += 1
-                if completed % 100 == 0 or completed == len(scan_days):
-                    print(f"Historical scan progress: {completed}/{len(scan_days)} weekdays processed; {len(historical_matches)} matching filings found so far.", flush=True)
+        def scan_dates(days, label):
+            fresh_days = [d for d in days if d not in scanned_days]
+            scanned_days.update(fresh_days)
+            failed = []
+            found = []
+            if not fresh_days:
+                return found, failed
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                futures = {pool.submit(fetch_historical_day, scan_day): scan_day for scan_day in fresh_days}
+                completed = 0
+                for future in as_completed(futures):
+                    scan_day = futures[future]
+                    try:
+                        _, listing = future.result()
+                        found.extend(filter_history_rows(listing, accepted_codes))
+                    except (requests.RequestException, ValueError, RuntimeError) as exc:
+                        failed.append(scan_day)
+                        print(f"Warning: {label} listing request failed for {scan_day}: {type(exc).__name__}")
+                    completed += 1
+                    if completed % 100 == 0 or completed == len(fresh_days):
+                        print(f"{label} progress: {completed}/{len(fresh_days)} new weekday queries; {len(found)} matching filings found.", flush=True)
+            return found, failed
 
-        print(f"Historical scan: {len(scan_days) - len(failed_days)}/{len(scan_days)} weekday queries succeeded; {len(failed_days)} failed.")
-        if failed_days:
-            print("WARNING: Historical scan incomplete; retrying failed dates serially after a cooldown.", flush=True)
-            time.sleep(60)
-            retry_failed = []
-            for failed_day in failed_days:
-                try:
-                    listing = fetch_listing(failed_day, api_key)
-                    historical_matches.extend(
-                        r for r in listing
-                        if str(r.get("docTypeCode", "")) in ANNUAL_REPORT_CODES
-                        and normalize_code(r.get("secCode")) in accepted_codes
-                        and str(r.get("csvFlag", "")) == "1"
-                        and str(r.get("legalStatus", "1")) in {"1", "2"}
-                        and str(r.get("withdrawalStatus", "0")) not in {"1", "2"}
-                        and str(r.get("docInfoEditStatus", "1")) != "2"
-                    )
-                except (requests.RequestException, ValueError, RuntimeError):
-                    retry_failed.append(failed_day)
-            failed_days = retry_failed
+        # The --days window is already queried above. Use it as the first attempt
+        # at locating the latest report; if absent, bootstrap by scanning backward
+        # up to 15 months, which covers a typical year-end plus the filing deadline.
+        latest_rows = [r for r in matches if str(r.get("docTypeCode", "")) == "120" and r.get("periodEnd")]
+        if not latest_rows:
+            bootstrap_start = max(full_start_day, today - timedelta(days=460))
+            found, failed = scan_dates(weekday_dates(bootstrap_start, end_day), "Latest-period bootstrap")
+            historical_matches.extend(found)
+            failed_days.extend(failed)
+            latest_rows = [r for r in historical_matches if str(r.get("docTypeCode", "")) == "120" and r.get("periodEnd")]
+
+        latest_period = max((str(r.get("periodEnd")) for r in latest_rows), default="")
+        expected_periods = []
+        if latest_period:
+            try:
+                latest_date = date.fromisoformat(latest_period)
+                for years_back in range(1, args.history_years):
+                    try:
+                        target = latest_date.replace(year=latest_date.year - years_back)
+                    except ValueError:
+                        target = latest_date.replace(year=latest_date.year - years_back, day=28)
+                    expected_periods.append(target)
+            except ValueError:
+                expected_periods = []
+
+        # First pass: two-to-four months after each expected prior fiscal year-end.
+        targeted_days = []
+        for target in expected_periods:
+            targeted_days.extend(weekday_dates(add_months(target, 2), add_months(target, 4)))
+        found, failed = scan_dates(targeted_days, "Targeted historical scan")
+        historical_matches.extend(found)
+        failed_days.extend(failed)
+
+        def discovered_period_ends():
+            return {str(r.get("periodEnd")) for r in (matches + historical_matches)
+                    if str(r.get("docTypeCode", "")) == "120" and r.get("periodEnd")}
+
+        missing_periods = [p for p in expected_periods if p.isoformat() not in discovered_period_ends()]
+        if missing_periods and not failed_days:
+            # Broaden only missing periods to one-to-five months after period end.
+            expanded_days = []
+            for target in missing_periods:
+                expanded_days.extend(weekday_dates(add_months(target, 1), add_months(target, 5)))
+            found, failed = scan_dates(expanded_days, "Expanded historical scan")
+            historical_matches.extend(found)
+            failed_days.extend(failed)
+            missing_periods = [p for p in expected_periods if p.isoformat() not in discovered_period_ends()]
+
+        if missing_periods or failed_days or not latest_period:
+            print("WARNING: targeted history did not fully reconcile; falling back to full historical scan.", flush=True)
+            found, failed = scan_dates(full_scan_days, "Full historical fallback")
+            historical_matches.extend(found)
+            failed_days.extend(failed)
+            # Retry failed dates once after a cooldown.
+            if failed_days:
+                time.sleep(60)
+                retry_failed = []
+                for failed_day in sorted(set(failed_days)):
+                    try:
+                        historical_matches.extend(filter_history_rows(fetch_listing(failed_day, api_key), accepted_codes))
+                    except (requests.RequestException, ValueError, RuntimeError):
+                        retry_failed.append(failed_day)
+                failed_days = retry_failed
+
+        scan_days = sorted(scanned_days)
+        print(f"Historical scan: {len(scan_days)} unique weekday queries; {len(failed_days)} failed after retry.");
         by_period = {}
         for row in matches + historical_matches:
             period_end = str(row.get("periodEnd") or "")
