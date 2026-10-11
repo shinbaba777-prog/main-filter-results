@@ -23,14 +23,18 @@ ELEMENT_METRICS = {
     "jppfs_cor:NetSales": "sales",
     "jpcrp_cor:NetSalesSummaryOfBusinessResults": "sales",
     "jppfs_cor:OperatingIncome": "operating_profit",
-    "jpcrp_cor:OperatingIncomeLossSummaryOfBusinessResults": "operating_profit",
+    "jpigp_cor:OperatingProfitLossIFRS": "operating_profit",
+    "jpcrp_cor:OperatingIncomeLossUSGAAPSummaryOfBusinessResults": "operating_profit",
     "jppfs_cor:OrdinaryIncome": "ordinary_profit",
     "jpcrp_cor:OrdinaryIncomeLossSummaryOfBusinessResults": "ordinary_profit",
     "jppfs_cor:ProfitLoss": "profit",
+    "jpcrp_cor:NetIncomeLossSummaryOfBusinessResults": "profit",
     "jpcrp_cor:ProfitLossAttributableToOwnersOfParentSummaryOfBusinessResults": "profit",
     "jpcrp_cor:BasicEarningsLossPerShareSummaryOfBusinessResults": "eps",
     "jpcrp_cor:NetCashProvidedByUsedInOperatingActivitiesSummaryOfBusinessResults": "ocf",
+    "jppfs_cor:NetCashProvidedByUsedInOperatingActivities": "ocf",
     "jpcrp_cor:NetCashProvidedByUsedInInvestingActivitiesSummaryOfBusinessResults": "icf",
+    "jppfs_cor:NetCashProvidedByUsedInInvestmentActivities": "icf",
 }
 METRICS = {
     "sales": ["売上高", "営業収益", "売上収益", "Revenue", "NetSales"],
@@ -143,7 +147,12 @@ def main():
                         candidates.append({**record, "candidate_metric": exact_metric,
                                            "mapping_status": "EXACT_ELEMENT_ID_REVIEW_REQUIRED"})
                     else:
+                        # Avoid classifying individual cash-flow line items as total OCF/ICF.
+                        # The total cash-flow concepts are mapped above by exact element ID.
+                        is_cashflow_component = concept.endswith("OpeCF") or concept.endswith("InvCF") or concept.endswith("FinCF")
                         for metric, needles in METRICS.items():
+                            if is_cashflow_component and metric in ("ocf", "icf", "fcf"):
+                                continue
                             if any(n.lower() in label_text.lower() for n in needles):
                                 candidates.append({**record, "candidate_metric": metric,
                                                    "mapping_status": "HEURISTIC_REVIEW_REQUIRED"})
