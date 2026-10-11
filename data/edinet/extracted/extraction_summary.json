@@ -1,10 +1,10 @@
 {
-  "generated_at_utc": "2026-10-11T06:36:24.153266+00:00",
+  "generated_at_utc": "2026-10-11T06:42:58.926217+00:00",
   "source_zips": [
     "44060_S100YGXD_xbrl_csv.zip"
   ],
   "numeric_rows": 1045,
-  "candidate_metric_rows": 188,
+  "candidate_metric_rows": 136,
   "outputs": [
     "data/edinet/extracted/xbrl_numeric_rows.csv",
     "data/edinet/extracted/financial_metric_candidates.csv"
