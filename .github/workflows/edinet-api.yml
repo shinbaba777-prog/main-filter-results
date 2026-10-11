@@ -31,6 +31,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,7 +44,12 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --disable-pip-version-check requests
 
+      - name: Compile Python scripts
+        run: python -m compileall -q scripts
+
       - name: Fetch EDINET filing metadata
+        id: fetch
+        continue-on-error: true
         env:
           EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
           SECURITIES_CODE: ${{ inputs.securities_code }}
@@ -63,18 +69,20 @@ jobs:
           python scripts/fetch_edinet.py $ARGS
 
       - name: Extract XBRL CSV values for review
-        if: ${{ inputs.download_csv || inputs.download_history }}
+        id: extract
+        if: ${{ steps.fetch.outcome == 'success' && (inputs.download_csv || inputs.download_history) }}
         run: python scripts/parse_edinet_csv.py
 
       - name: Validate candidate metadata for manual review
-        if: ${{ inputs.download_csv || inputs.download_history }}
+        if: ${{ steps.fetch.outcome == 'success' && (inputs.download_csv || inputs.download_history) }}
         run: python scripts/validate_edinet_candidates.py
 
       - name: Build core metric review queue
-        if: ${{ inputs.download_csv || inputs.download_history }}
+        if: ${{ steps.fetch.outcome == 'success' && (inputs.download_csv || inputs.download_history) }}
         run: python scripts/build_edinet_core_metric_review.py
 
       - name: Commit refreshed EDINET data
+        if: ${{ always() }}
         run: |
           git add data/edinet
           if git diff --cached --quiet; then
@@ -89,3 +97,9 @@ jobs:
           git fetch origin main
           git rebase origin/main
           git push
+
+      - name: Fail workflow if EDINET fetch or extraction was incomplete
+        if: ${{ always() && (steps.fetch.outcome != 'success' || ((inputs.download_csv || inputs.download_history) && steps.extract.outcome == 'failure')) }}
+        run: |
+          echo "EDINET fetch or extraction was incomplete. See download_manifest.json and the job summary."
+          exit 1
