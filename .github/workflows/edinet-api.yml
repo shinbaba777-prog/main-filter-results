@@ -9,7 +9,12 @@ on:
         default: ""
         type: string
       download_csv:
-        description: "Download the latest annual-report XBRL CSV ZIP for the code"
+        description: "Download annual-report XBRL CSV ZIPs for the code"
+        required: false
+        default: false
+        type: boolean
+      download_history:
+        description: "Scan up to 5 years and download annual reports for 5 fiscal periods"
         required: false
         default: false
         type: boolean
@@ -43,6 +48,7 @@ jobs:
           EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
           SECURITIES_CODE: ${{ inputs.securities_code }}
           DOWNLOAD_CSV: ${{ inputs.download_csv }}
+          DOWNLOAD_HISTORY: ${{ inputs.download_history }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           ARGS="--days 14"
@@ -54,6 +60,9 @@ jobs:
           fi
           if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$DOWNLOAD_CSV" = "true" ]; then
             ARGS="$ARGS --download-csv"
+          fi
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$DOWNLOAD_HISTORY" = "true" ]; then
+            ARGS="$ARGS --history-years 5"
           fi
           python scripts/fetch_edinet.py $ARGS
 
