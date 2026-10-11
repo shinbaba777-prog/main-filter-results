@@ -33,13 +33,26 @@ def normalize_code(value: object) -> str:
 
 
 def api_get(path: str, params: dict, api_key: str) -> requests.Response:
-    response = requests.get(
-        f"{BASE}/{path}",
-        params={**params, "Subscription-Key": api_key},
-        timeout=60,
-    )
-    response.raise_for_status()
-    return response
+    # EDINET may rate-limit historical CSV downloads. Retry 429/5xx responses
+    # with exponential backoff and honor Retry-After when provided.
+    url = f"{BASE}/{path}"
+    request_params = {**params, "Subscription-Key": api_key}
+    for attempt in range(6):
+        response = requests.get(url, params=request_params, timeout=(10, 60))
+        if response.status_code == 429 or response.status_code in {500, 502, 503, 504}:
+            if attempt == 5:
+                response.raise_for_status()
+            retry_after = response.headers.get("Retry-After", "").strip()
+            try:
+                delay = min(60.0, max(1.0, float(retry_after))) if retry_after else min(60.0, 2.0 ** attempt * 2.0)
+            except ValueError:
+                delay = min(60.0, 2.0 ** attempt * 2.0)
+            print(f"EDINET temporary HTTP {response.status_code}; retrying in {delay:.0f}s (attempt {attempt + 1}/6).", flush=True)
+            time.sleep(delay)
+            continue
+        response.raise_for_status()
+        return response
+    raise RuntimeError("EDINET request retries exhausted")
 
 
 def fetch_listing(day: date, api_key: str) -> list[dict]:
@@ -184,8 +197,9 @@ def main() -> int:
         print(f"Historical scan: {len(scan_days)} weekdays queried; {len(historical_matches)} matching records; {len(selected)} fiscal periods selected.", flush=True)
         for row in reversed(selected):
             path = download_csv_zip(row, api_key)
-            print(f"Downloaded annual-report CSV ZIP: {path} (periodEnd={row.get('periodEnd')})")
-            time.sleep(0.25)
+            print(f"Downloaded annual-report CSV ZIP: {path} (periodEnd={row.get('periodEnd')})", flush=True)
+            # Keep requests spaced out to reduce the chance of HTTP 429 responses.
+            time.sleep(2.0)
         if len(selected) < args.history_years:
             print("WARNING: Fewer fiscal periods were available than requested; missing years must not be treated as zero.")
     elif args.download_csv:
