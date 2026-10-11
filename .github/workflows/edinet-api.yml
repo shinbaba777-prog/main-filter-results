@@ -65,6 +65,10 @@ jobs:
         if: ${{ inputs.download_csv }}
         run: python scripts/validate_edinet_candidates.py
 
+      - name: Build core metric review queue
+        if: ${{ inputs.download_csv }}
+        run: python scripts/build_edinet_core_metric_review.py
+
       - name: Commit refreshed EDINET data
         run: |
           git add data/edinet
@@ -74,5 +78,5 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Refresh EDINET filing data and extracted candidates"
+          git commit -m "Refresh EDINET data and core metric review queue"
           git push
