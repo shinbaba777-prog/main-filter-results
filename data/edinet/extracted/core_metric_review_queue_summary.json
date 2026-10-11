@@ -1,21 +1,21 @@
 {
-  "generated_at_utc": "2026-10-11T07:34:49.965203+00:00",
+  "generated_at_utc": "2026-10-11T07:52:45.128159+00:00",
   "input": "data/edinet/extracted/financial_metric_candidates.csv",
   "output": "data/edinet/extracted/core_metric_review_queue.csv",
-  "rows_queued": 42,
-  "rows_before_deduplication": 44,
-  "duplicate_rows_collapsed": 2,
+  "rows_queued": 84,
+  "rows_before_deduplication": 88,
+  "duplicate_rows_collapsed": 4,
   "counts": {
-    "queued_sales": 7,
-    "queued_ordinary_profit": 7,
-    "queued_profit": 9,
-    "excluded_concept_or_metric": 56,
-    "queued_eps": 5,
-    "queued_ocf": 7,
-    "queued_icf": 7,
-    "excluded_nonannual_or_member_context": 36,
-    "queued_operating_profit": 2,
-    "duplicate_rows_collapsed": 2
+    "queued_sales": 14,
+    "queued_ordinary_profit": 14,
+    "queued_profit": 18,
+    "excluded_concept_or_metric": 112,
+    "queued_eps": 10,
+    "queued_ocf": 14,
+    "queued_icf": 14,
+    "excluded_nonannual_or_member_context": 72,
+    "queued_operating_profit": 4,
+    "duplicate_rows_collapsed": 4
   },
   "important_warning": "Review queue only. No row is approved for investment scoring. Confirm official filing, fiscal period dates, taxonomy definition, unit/scale, signs, and duplicates before use."
 }
