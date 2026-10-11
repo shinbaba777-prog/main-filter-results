@@ -122,9 +122,16 @@ def main():
                               "raw_row_json": json.dumps(rec, ensure_ascii=False)}
                     all_rows.append(record)
                     label_text = label + " " + " ".join(rec.keys())
-                    for metric, needles in METRICS.items():
-                        if any(n.lower() in label_text.lower() for n in needles):
-                            candidates.append({**record, "candidate_metric": metric, "mapping_status": "REVIEW_REQUIRED"})
+                    concept = clean(rec.get("要素ID", ""))
+                    exact_metric = ELEMENT_METRICS.get(concept)
+                    if exact_metric:
+                        candidates.append({**record, "candidate_metric": exact_metric,
+                                           "mapping_status": "EXACT_ELEMENT_ID_REVIEW_REQUIRED"})
+                    else:
+                        for metric, needles in METRICS.items():
+                            if any(n.lower() in label_text.lower() for n in needles):
+                                candidates.append({**record, "candidate_metric": metric,
+                                                   "mapping_status": "HEURISTIC_REVIEW_REQUIRED"})
     long_path = OUT / "xbrl_numeric_rows.csv"
     with long_path.open("w", newline="", encoding="utf-8-sig") as f:
         fields = ["security_code","source_zip","source_csv","row_number","label_or_concept","value_column","value","raw_row_json"]
