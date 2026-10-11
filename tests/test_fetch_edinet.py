@@ -32,6 +32,26 @@ class FetchEdinetTests(unittest.TestCase):
         self.assertEqual(fetch_edinet.normalize_code("ABCDE"), "")
         self.assertEqual(fetch_edinet.normalize_code("44-06"), "")
 
+    def test_add_months_clamps_end_of_month(self):
+        self.assertEqual(fetch_edinet.add_months(date(2024, 1, 31), 1), date(2024, 2, 29))
+        self.assertEqual(fetch_edinet.add_months(date(2024, 11, 30), 3), date(2025, 2, 28))
+
+    def test_weekday_dates_are_inclusive_and_skip_weekends(self):
+        self.assertEqual(
+            fetch_edinet.weekday_dates(date(2026, 10, 9), date(2026, 10, 12)),
+            [date(2026, 10, 9), date(2026, 10, 12)],
+        )
+
+    def test_history_filter_keeps_only_matching_valid_issuer_filings(self):
+        rows = [
+            {"docTypeCode": "120", "secCode": "44060", "csvFlag": "1"},
+            {"docTypeCode": "120", "secCode": "99990", "csvFlag": "1"},
+            {"docTypeCode": "120", "secCode": "44060", "csvFlag": "0"},
+            {"docTypeCode": "130", "secCode": "44060", "csvFlag": "1"},
+        ]
+        filtered = fetch_edinet.filter_history_rows(rows, {"4406", "44060"})
+        self.assertEqual(len(filtered), 2)
+
     def test_listing_without_metadata_is_not_an_empty_day(self):
         with patch.object(fetch_edinet, "api_get", return_value=FakeResponse(payload={"StatusCode": 429, "message": "Too Many Requests"})):
             with self.assertRaises(fetch_edinet.EdinetError):
