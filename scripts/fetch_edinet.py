@@ -145,8 +145,9 @@ def main() -> int:
         def fetch_historical_day(scan_day):
             return scan_day, fetch_listing(scan_day, api_key)
 
-        with ThreadPoolExecutor(max_workers=6) as pool:
+        with ThreadPoolExecutor(max_workers=12) as pool:
             futures = {pool.submit(fetch_historical_day, scan_day): scan_day for scan_day in scan_days}
+            completed = 0
             for future in as_completed(futures):
                 scan_day = futures[future]
                 try:
@@ -161,6 +162,9 @@ def main() -> int:
                 except (requests.RequestException, ValueError, RuntimeError) as exc:
                     failed_days.append(scan_day)
                     print(f"Warning: historical listing request failed for {scan_day}: {type(exc).__name__}")
+                completed += 1
+                if completed % 100 == 0 or completed == len(scan_days):
+                    print(f"Historical scan progress: {completed}/{len(scan_days)} weekdays processed; {len(historical_matches)} matching filings found so far.", flush=True)
 
         print(f"Historical scan: {len(scan_days) - len(failed_days)}/{len(scan_days)} weekday queries succeeded; {len(failed_days)} failed.")
         if failed_days:
