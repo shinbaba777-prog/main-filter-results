@@ -87,7 +87,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--days", type=int, default=14, help="Days of listing metadata to refresh")
     parser.add_argument("--code", default="", help="Optional Japanese securities code, e.g. 44060 or 4406")
-    parser.add_argument("--download-csv", action="store_true", help="Download CSV ZIP for the latest matching annual report")
+    parser.add_argument("--download-csv", action="store_true", help="Download the latest matching annual report CSV")
+    parser.add_argument("--history-years", type=int, default=0, help="Scan up to 5 years of annual filings for --code")
     args = parser.parse_args()
 
     api_key = os.environ.get("EDINET_API_KEY", "").strip()
@@ -97,6 +98,13 @@ def main() -> int:
     if not 1 <= args.days <= 365:
         print("ERROR: --days must be between 1 and 365.", file=sys.stderr)
         return 2
+    if not 0 <= args.history_years <= 5:
+        print("ERROR: --history-years must be between 0 and 5.", file=sys.stderr)
+        return 2
+    code = normalize_code(args.code)
+    if args.history_years and (not args.download_csv or not code):
+        print("ERROR: --history-years requires --download-csv and --code.", file=sys.stderr)
+        return 2
 
     today = datetime.now(timezone.utc).date()
     rows: list[dict] = []
@@ -105,42 +113,67 @@ def main() -> int:
         try:
             rows.extend(fetch_listing(day, api_key))
         except requests.HTTPError as exc:
-            # EDINET may not have a listing on non-business days; keep going for individual days.
             print(f"Warning: listing request failed for {day}: HTTP {exc.response.status_code if exc.response else 'unknown'}")
         except (requests.RequestException, ValueError, RuntimeError) as exc:
             print(f"Warning: listing request failed for {day}: {type(exc).__name__}")
         time.sleep(0.25)
 
-    # Deduplicate document IDs while preserving the latest returned record.
     unique = {str(row.get("docID")): row for row in rows if row.get("docID")}
     rows = list(unique.values())
-    write_metadata(rows)
     annual = [r for r in rows if str(r.get("docTypeCode", "")) in ANNUAL_REPORT_CODES]
+    accepted_codes = {code, code + "0"} if len(code) == 4 else ({code} if code else set())
+    matches = [r for r in annual if normalize_code(r.get("secCode")) in accepted_codes and str(r.get("csvFlag", "")) == "1" and str(r.get("legalStatus", "1")) in {"1", "2"}]
+    print(f"Recent EDINET filing records: {len(rows)}; annual-report candidates: {len(annual)}")
 
-    print(f"Saved {len(rows)} EDINET filing records to data/edinet/documents.csv")
-    print(f"Annual-report candidates in the refreshed window: {len(annual)}")
-
-    if args.download_csv:
-        code = normalize_code(args.code)
+    if args.history_years:
+        # EDINET listing is date-scoped; scan weekdays and retain only the requested issuer.
+        start_day = today - timedelta(days=365 * args.history_years)
+        day = start_day
+        scanned = 0
+        historical_matches = []
+        while day <= today - timedelta(days=args.days):
+            if day.weekday() < 5:
+                try:
+                    listing = fetch_listing(day, api_key)
+                    scanned += 1
+                    historical_matches.extend(r for r in listing if str(r.get("docTypeCode", "")) in ANNUAL_REPORT_CODES and normalize_code(r.get("secCode")) in accepted_codes and str(r.get("csvFlag", "")) == "1" and str(r.get("legalStatus", "1")) in {"1", "2"})
+                except (requests.RequestException, ValueError, RuntimeError) as exc:
+                    print(f"Warning: historical listing request failed for {day}: {type(exc).__name__}")
+                time.sleep(0.25)
+            day += timedelta(days=1)
+        by_period = {}
+        for row in matches + historical_matches:
+            period_end = str(row.get("periodEnd") or "")
+            if not row.get("docID") or not period_end:
+                continue
+            old = by_period.get(period_end)
+            if old is None or str(row.get("submitDateTime") or "") > str(old.get("submitDateTime") or ""):
+                by_period[period_end] = row
+        selected = sorted(by_period.values(), key=lambda r: str(r.get("periodEnd") or ""), reverse=True)[:args.history_years]
+        if not selected:
+            print(f"ERROR: no annual-report CSV filings found for securities code {code}.", file=sys.stderr)
+            return 2
+        print(f"Historical scan: {scanned} weekdays queried; {len(historical_matches)} matching records; {len(selected)} fiscal periods selected.")
+        for row in reversed(selected):
+            path = download_csv_zip(row, api_key)
+            print(f"Downloaded annual-report CSV ZIP: {path} (periodEnd={row.get('periodEnd')})")
+            time.sleep(0.25)
+        if len(selected) < args.history_years:
+            print("WARNING: Fewer fiscal periods were available than requested; missing years must not be treated as zero.")
+    elif args.download_csv:
         if not code:
             print("ERROR: --download-csv requires --code.", file=sys.stderr)
             return 2
-        # EDINET often represents a 4-digit listed code as 5 digits ending in zero.
-        accepted_codes = {code, code + "0"} if len(code) == 4 else {code}
-        matches = [
-            r for r in annual
-            if normalize_code(r.get("secCode")) in accepted_codes
-            and str(r.get("csvFlag", "")) == "1"
-            and str(r.get("legalStatus", "1")) in {"1", "2"}
-        ]
         if not matches:
             print(f"No downloadable annual-report CSV found for securities code {code} in the last {args.days} days.")
-            print("The report may be older than the lookback window or CSV may not be available; increase --days or use the filing docID.")
+            print("Try --history-years 5 to scan older annual filings.")
             return 0
         matches.sort(key=lambda r: r.get("submitDateTime", ""), reverse=True)
         path = download_csv_zip(matches[0], api_key)
         print(f"Downloaded latest matching XBRL CSV ZIP: {path}")
-    return 0
+
+    write_metadata(rows)
+    print(f"Saved {len(rows)} recent EDINET filing records to data/edinet/documents.csv")    return 0
 
 
 if __name__ == "__main__":
