@@ -18,6 +18,9 @@ SOURCE = OUT / "financial_metric_candidates.csv"
 AUDIT = OUT / "financial_metric_audit.csv"
 SUMMARY = OUT / "financial_metric_audit_summary.json"
 
+def metric_is_eps(row):
+    return row.get("candidate_metric", "") == "eps"
+
 def main():
     if not SOURCE.exists():
         raise SystemExit(f"Missing input: {SOURCE}")
@@ -46,7 +49,9 @@ def main():
                 flags.append("CONSOLIDATION_SCOPE_UNCLEAR")
             if period not in ("期間", "時点"):
                 flags.append("PERIOD_TYPE_UNCLEAR")
-            if not unit_id or not unit_label:
+            # EDINET EPS uses JPYPerShares as the unit ID with an intentionally blank unit label.
+            unit_ok = (unit_id == "JPYPerShares") if metric_is_eps(row) else bool(unit_id and unit_label)
+            if not unit_ok:
                 flags.append("UNIT_UNCLEAR")
             metric = row.get("candidate_metric", "")
             if metric in ("sales", "operating_profit", "ordinary_profit", "profit", "ocf", "icf", "fcf") and period != "期間":
