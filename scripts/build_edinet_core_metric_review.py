@@ -33,7 +33,7 @@ FIELDS = [
     "security_code", "candidate_metric", "value", "relative_year",
     "source_zip", "source_csv", "row_number", "element_id", "context_id",
     "period_type", "consolidation_scope", "unit_id", "unit_label",
-    "review_status", "review_reason", "raw_row_json",
+    "review_status", "review_reason", "duplicate_count", "source_row_numbers", "raw_row_json",
 ]
 
 def main():
@@ -98,6 +98,29 @@ def main():
             }
             rows.append(rec)
             counts["queued_" + metric] += 1
+    # Collapse exact duplicate facts from the same filing/member/context. Keep
+    # provenance for every source row so deduplication remains auditable.
+    deduped = {}
+    duplicate_rows_collapsed = 0
+    key_fields = (
+        "security_code", "candidate_metric", "value", "source_zip", "source_csv",
+        "element_id", "context_id", "period_type", "consolidation_scope",
+        "unit_id", "unit_label",
+    )
+    for rec in rows:
+        key = tuple(rec.get(k, "") for k in key_fields)
+        if key not in deduped:
+            rec["duplicate_count"] = 1
+            rec["source_row_numbers"] = rec.get("row_number", "")
+            deduped[key] = rec
+        else:
+            existing = deduped[key]
+            existing["duplicate_count"] = int(existing["duplicate_count"]) + 1
+            existing["source_row_numbers"] += ";" + rec.get("row_number", "")
+            duplicate_rows_collapsed += 1
+    rows = list(deduped.values())
+    counts["duplicate_rows_collapsed"] = duplicate_rows_collapsed
+
     with QUEUE.open("w", encoding="utf-8-sig", newline="") as f:
         w = csv.DictWriter(f, fieldnames=FIELDS)
         w.writeheader()
@@ -107,6 +130,8 @@ def main():
         "input": str(SOURCE.relative_to(ROOT)),
         "output": str(QUEUE.relative_to(ROOT)),
         "rows_queued": len(rows),
+        "rows_before_deduplication": len(rows) + duplicate_rows_collapsed,
+        "duplicate_rows_collapsed": duplicate_rows_collapsed,
         "counts": dict(counts),
         "important_warning": "Review queue only. No row is approved for investment scoring. Confirm official filing, fiscal period dates, taxonomy definition, unit/scale, signs, and duplicates before use."
     }
