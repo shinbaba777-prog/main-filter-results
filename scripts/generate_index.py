@@ -72,7 +72,7 @@ const records = __DATA__;
  const cardsBox=document.getElementById("cards"), search=document.getElementById("search"), count=document.getElementById("count"), empty=document.getElementById("empty");
  const prev=document.getElementById("prev"), next=document.getElementById("next"), pages=document.getElementById("pages");
  let filter="all", sort="date", page=1;
- const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",""":"&quot;","'":"&#39;"}[c]));
+ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>{const m={"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;"};return c==='"'?"&quot;":m[c];});
  function pending(r){return !r.score || (r.judgment||"").includes("DATA-INSUFFICIENT") || (r.judgment||"").includes("判定不能") || (r.judgment||"").includes("確認待ち");}
  function filtered(){
   const q=search.value.trim().toLowerCase();
