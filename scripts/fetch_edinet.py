@@ -256,6 +256,10 @@ def main() -> int:
             period_end = str(row.get("periodEnd") or "")
             if not row.get("docID") or not period_end:
                 continue
+            # Keep the original annual report as the fiscal-period source.
+            # Amendments are recorded separately in the manifest and never silently replace it.
+            if str(row.get("docTypeCode", "")) != "120":
+                continue
             old = by_period.get(period_end)
             if old is None or str(row.get("submitDateTime") or "") > str(old.get("submitDateTime") or ""):
                 by_period[period_end] = row
@@ -310,7 +314,22 @@ def main() -> int:
             print(f"No downloadable annual-report CSV found for securities code {code} in the last {args.days} days.")
             return 3
         matches.sort(key=lambda r: r.get("submitDateTime", ""), reverse=True)
-        path = download_csv_zip(matches[0], api_key)
+        try:
+            path = download_csv_zip(matches[0], api_key)
+        except (requests.RequestException, ValueError, RuntimeError, OSError) as exc:
+            OUT.mkdir(parents=True, exist_ok=True)
+            manifest = {"requested_code": code, "requested_periods": 1, "status": "incomplete",
+                        "periods": [{"periodEnd": matches[0].get("periodEnd") or "", "docID": matches[0].get("docID"),
+                                     "status": "missing", "reason": type(exc).__name__}],
+                        "gaps": [], "failed_scan_dates": [], "amendments": []}
+            (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"ERROR: latest CSV download failed ({type(exc).__name__}); API key and URL redacted.", file=sys.stderr)
+            return 3
+        manifest = {"requested_code": code, "requested_periods": 1, "status": "complete",
+                    "periods": [{"periodEnd": matches[0].get("periodEnd") or "", "docID": matches[0].get("docID"),
+                                 "status": "downloaded", "file": path.name}],
+                    "gaps": [], "failed_scan_dates": [], "amendments": []}
+        (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"Downloaded latest matching XBRL CSV ZIP: {path}")
 
     write_metadata(rows)
