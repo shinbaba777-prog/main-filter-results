@@ -21,8 +21,12 @@ CONCEPTS = {
     ("sales", "jppfs_cor:NetSales"),
     ("sales", "jpcrp_cor:NetSalesSummaryOfBusinessResults"),
     ("operating_profit", "jppfs_cor:OperatingIncome"),
+    ("operating_profit", "jpcrp_cor:OperatingIncomeLossSummaryOfBusinessResults"),
     ("ordinary_profit", "jppfs_cor:OrdinaryIncome"),
+    ("ordinary_profit", "jpcrp_cor:OrdinaryIncomeLossSummaryOfBusinessResults"),
     ("profit", "jppfs_cor:ProfitLoss"),
+    ("profit", "jpcrp_cor:ProfitLossAttributableToOwnersOfParentSummaryOfBusinessResults"),
+    ("eps", "jpcrp_cor:BasicEarningsLossPerShareSummaryOfBusinessResults"),
     ("ocf", "jpcrp_cor:NetCashProvidedByUsedInOperatingActivitiesSummaryOfBusinessResults"),
     ("icf", "jpcrp_cor:NetCashProvidedByUsedInInvestingActivitiesSummaryOfBusinessResults"),
 }
@@ -64,7 +68,11 @@ def main():
             # Scope other than consolidated is retained only for manual review
             # for these explicitly identified cash-flow summary concepts.
             scope_unclear = scope != "連結"
-            if scope_unclear and metric not in ("ocf", "icf"):
+            # Business-results summary concepts commonly carry the EDINET scope
+            # label "その他". Keep these exact, allowlisted concepts for review,
+            # but explicitly flag scope as unverified instead of assuming consolidated.
+            is_summary_concept = concept.startswith("jpcrp_cor:") and concept.endswith("SummaryOfBusinessResults")
+            if scope_unclear and not is_summary_concept:
                 counts["excluded_nonconsolidated_or_unclear_scope"] += 1
                 continue
             expected_period = "時点" if metric in ("equity", "total_assets") else "期間"
