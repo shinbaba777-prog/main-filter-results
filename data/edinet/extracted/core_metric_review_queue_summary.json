@@ -1,8 +1,10 @@
 {
-  "generated_at_utc": "2026-10-11T00:21:38.576049+00:00",
+  "generated_at_utc": "2026-10-11T00:27:15.349954+00:00",
   "input": "data/edinet/extracted/financial_metric_candidates.csv",
   "output": "data/edinet/extracted/core_metric_review_queue.csv",
-  "rows_queued": 10,
+  "rows_queued": 8,
+  "rows_before_deduplication": 10,
+  "duplicate_rows_collapsed": 2,
   "counts": {
     "excluded_nonconsolidated_or_unclear_scope": 5,
     "excluded_concept_or_metric": 152,
@@ -10,7 +12,8 @@
     "queued_sales": 2,
     "queued_operating_profit": 2,
     "queued_ordinary_profit": 2,
-    "queued_profit": 4
+    "queued_profit": 4,
+    "duplicate_rows_collapsed": 2
   },
   "important_warning": "Review queue only. No row is approved for investment scoring. Confirm official filing, fiscal period dates, taxonomy definition, unit/scale, signs, and duplicates before use."
 }
