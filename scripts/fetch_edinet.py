@@ -341,10 +341,23 @@ def main() -> int:
         failed_days.extend(failed)
 
         def discovered_period_ends():
-            return {str(r.get("periodEnd")) for r in (matches + historical_matches)
-                    if str(r.get("docTypeCode", "")) == "120" and r.get("periodEnd")}
+            ends = []
+            for row in matches + historical_matches:
+                if str(row.get("docTypeCode", "")) != "120" or not row.get("periodEnd"):
+                    continue
+                try:
+                    ends.append(date.fromisoformat(str(row.get("periodEnd"))))
+                except ValueError:
+                    continue
+            return ends
 
-        missing_periods = [p for p in expected_periods if p.isoformat() not in discovered_period_ends()]
+        def periods_missing_from_scan():
+            ends = discovered_period_ends()
+            # Allow small fiscal-calendar shifts (e.g. 52/53-week years) while
+            # still treating a genuinely absent fiscal period as a scan gap.
+            return [p for p in expected_periods if not any(abs((end - p).days) <= 45 for end in ends)]
+
+        missing_periods = periods_missing_from_scan()
         if missing_periods and not failed_days:
             # Broaden only missing periods to one-to-five months after period end.
             expanded_days = []
@@ -353,7 +366,7 @@ def main() -> int:
             found, failed = scan_dates(expanded_days, "Expanded historical scan")
             historical_matches.extend(found)
             failed_days.extend(failed)
-            missing_periods = [p for p in expected_periods if p.isoformat() not in discovered_period_ends()]
+            missing_periods = periods_missing_from_scan()
 
         if missing_periods or failed_days or not latest_period:
             print("WARNING: targeted history did not fully reconcile; falling back to full historical scan.", flush=True)
