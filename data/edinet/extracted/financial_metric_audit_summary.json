@@ -1,0 +1,14 @@
+{
+  "generated_at_utc": "2026-10-11T00:14:57.689560+00:00",
+  "input": "data/edinet/extracted/financial_metric_candidates.csv",
+  "output": "data/edinet/extracted/financial_metric_audit.csv",
+  "candidate_rows_audited": 188,
+  "status_counts": {
+    "REVIEW_REQUIRED": 150,
+    "flag:NOT_CURRENT_YEAR_CONTEXT": 140,
+    "flag:CONSOLIDATION_SCOPE_UNCLEAR": 90,
+    "flag:UNIT_UNCLEAR": 30,
+    "STRUCTURALLY_PLAUSIBLE_REVIEW_REQUIRED": 38
+  },
+  "important_warning": "No row is approved for investment scoring. STRUCTURALLY_PLAUSIBLE_REVIEW_REQUIRED means only basic fields look consistent; concept definitions, filing context, period dates, consolidated statements, signs, and duplicates still require verification."
+}
