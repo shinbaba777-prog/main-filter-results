@@ -17,6 +17,21 @@ from datetime import datetime, timezone
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "edinet"
 OUT = DATA / "extracted"
+
+# Exact XBRL element IDs are candidate mappings only; all remain review-required.
+ELEMENT_METRICS = {
+    "jppfs_cor:NetSales": "sales",
+    "jpcrp_cor:NetSalesSummaryOfBusinessResults": "sales",
+    "jppfs_cor:OperatingIncome": "operating_profit",
+    "jpcrp_cor:OperatingIncomeLossSummaryOfBusinessResults": "operating_profit",
+    "jppfs_cor:OrdinaryIncome": "ordinary_profit",
+    "jpcrp_cor:OrdinaryIncomeLossSummaryOfBusinessResults": "ordinary_profit",
+    "jppfs_cor:ProfitLoss": "profit",
+    "jpcrp_cor:ProfitLossAttributableToOwnersOfParentSummaryOfBusinessResults": "profit",
+    "jpcrp_cor:BasicEarningsLossPerShareSummaryOfBusinessResults": "eps",
+    "jpcrp_cor:NetCashProvidedByUsedInOperatingActivitiesSummaryOfBusinessResults": "ocf",
+    "jpcrp_cor:NetCashProvidedByUsedInInvestingActivitiesSummaryOfBusinessResults": "icf",
+}
 METRICS = {
     "sales": ["売上高", "営業収益", "売上収益", "Revenue", "NetSales"],
     "operating_profit": ["営業利益", "OperatingIncome"],
