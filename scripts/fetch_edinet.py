@@ -317,11 +317,13 @@ def main() -> int:
                     manifest["gaps"].append({"from": left, "to": right, "reason": "period_gap_over_400_days"})
             except ValueError:
                 manifest["gaps"].append({"from": left, "to": right, "reason": "invalid_period_end"})
-        if failed_days or downloaded < len(selected) or len(selected) < args.history_years or manifest["gaps"]:
+        if failed_days or downloaded < len(selected) or manifest["gaps"]:
             manifest["status"] = "incomplete"
         elif len(selected) == args.history_years:
             manifest["status"] = "complete"
         else:
+            # Fewer periods can be legitimate for a newly listed issuer only when
+            # the scan itself succeeded and the periods show no unexplained gap.
             manifest["status"] = "complete_short_history"
         OUT.mkdir(parents=True, exist_ok=True)
         (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
