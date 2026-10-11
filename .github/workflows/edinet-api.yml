@@ -20,6 +20,11 @@ on:
         type: boolean
   schedule:
     - cron: "35 16 * * *" # 01:35 JST daily
+  push:
+    paths:
+      - ".github/workflows/edinet-api.yml"
+      - "scripts/**"
+      - "tests/**"
 
 permissions:
   contents: write
