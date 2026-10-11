@@ -23,6 +23,8 @@ CONCEPTS = {
     ("operating_profit", "jppfs_cor:OperatingIncome"),
     ("ordinary_profit", "jppfs_cor:OrdinaryIncome"),
     ("profit", "jppfs_cor:ProfitLoss"),
+    ("ocf", "jpcrp_cor:NetCashProvidedByUsedInOperatingActivitiesSummaryOfBusinessResults"),
+    ("icf", "jpcrp_cor:NetCashProvidedByUsedInInvestingActivitiesSummaryOfBusinessResults"),
 }
 CONTEXTS = {
     f"{prefix}{kind}"
@@ -59,11 +61,16 @@ def main():
             if context not in CONTEXTS:
                 counts["excluded_nonannual_or_member_context"] += 1
                 continue
-            if scope != "連結":
+            # Scope other than consolidated is retained only for manual review
+            # for these explicitly identified cash-flow summary concepts.
+            scope_unclear = scope != "連結"
+            if scope_unclear and metric not in ("ocf", "icf"):
                 counts["excluded_nonconsolidated_or_unclear_scope"] += 1
                 continue
             expected_period = "時点" if metric in ("equity", "total_assets") else "期間"
             reasons = []
+            if scope_unclear:
+                reasons.append("CONSOLIDATION_SCOPE_UNCLEAR")
             if period != expected_period:
                 reasons.append("PERIOD_TYPE_MISMATCH")
             if not unit_id or not unit_label:
