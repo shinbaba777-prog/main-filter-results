@@ -173,7 +173,8 @@ def main() -> int:
         print(f"Downloaded latest matching XBRL CSV ZIP: {path}")
 
     write_metadata(rows)
-    print(f"Saved {len(rows)} recent EDINET filing records to data/edinet/documents.csv")    return 0
+    print(f"Saved {len(rows)} recent EDINET filing records to data/edinet/documents.csv")
+    return 0
 
 
 if __name__ == "__main__":
