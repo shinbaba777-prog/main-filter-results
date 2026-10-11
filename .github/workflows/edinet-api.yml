@@ -61,6 +61,10 @@ jobs:
         if: ${{ inputs.download_csv }}
         run: python scripts/parse_edinet_csv.py
 
+      - name: Validate candidate metadata for manual review
+        if: ${{ inputs.download_csv }}
+        run: python scripts/validate_edinet_candidates.py
+
       - name: Commit refreshed EDINET data
         run: |
           git add data/edinet
