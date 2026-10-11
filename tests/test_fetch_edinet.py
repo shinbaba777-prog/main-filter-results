@@ -62,8 +62,8 @@ class FetchEdinetTests(unittest.TestCase):
         self.assertEqual(get.call_count, 1)
 
     def test_api_key_is_not_in_exception_text(self):
-        denied = FakeResponse(payload={"StatusCode": 401, "message": "Unauthorized"})
         secret = "TOP_SECRET_KEY_DO_NOT_LOG"
+        denied = FakeResponse(payload={"StatusCode": 401, "message": "Unauthorized " + secret})
         with patch.object(fetch_edinet.requests, "get", return_value=denied), \
              patch.object(fetch_edinet.THROTTLE, "wait"):
             with self.assertRaises(fetch_edinet.EdinetAuthError) as ctx:
