@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-11T13:00:06.104573+00:00",
+  "generated_at_utc": "2026-10-11T20:32:16.854883+00:00",
   "input": "data/edinet/extracted/financial_metric_candidates.csv",
   "output": "data/edinet/extracted/core_metric_review_queue.csv",
   "rows_queued": 210,
