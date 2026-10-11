@@ -240,6 +240,8 @@ def main() -> int:
                         and normalize_code(r.get("secCode")) in accepted_codes
                         and str(r.get("csvFlag", "")) == "1"
                         and str(r.get("legalStatus", "1")) in {"1", "2"}
+                        and str(r.get("withdrawalStatus", "0")) not in {"1", "2"}
+                        and str(r.get("docInfoEditStatus", "1")) != "2"
                     )
                 except (requests.RequestException, ValueError, RuntimeError) as exc:
                     failed_days.append(scan_day)
@@ -250,7 +252,24 @@ def main() -> int:
 
         print(f"Historical scan: {len(scan_days) - len(failed_days)}/{len(scan_days)} weekday queries succeeded; {len(failed_days)} failed.")
         if failed_days:
-            print("WARNING: Historical scan was incomplete; review failed dates before relying on year coverage.")
+            print("WARNING: Historical scan incomplete; retrying failed dates serially after a cooldown.", flush=True)
+            time.sleep(60)
+            retry_failed = []
+            for failed_day in failed_days:
+                try:
+                    listing = fetch_listing(failed_day, api_key)
+                    historical_matches.extend(
+                        r for r in listing
+                        if str(r.get("docTypeCode", "")) in ANNUAL_REPORT_CODES
+                        and normalize_code(r.get("secCode")) in accepted_codes
+                        and str(r.get("csvFlag", "")) == "1"
+                        and str(r.get("legalStatus", "1")) in {"1", "2"}
+                        and str(r.get("withdrawalStatus", "0")) not in {"1", "2"}
+                        and str(r.get("docInfoEditStatus", "1")) != "2"
+                    )
+                except (requests.RequestException, ValueError, RuntimeError):
+                    retry_failed.append(failed_day)
+            failed_days = retry_failed
         by_period = {}
         for row in matches + historical_matches:
             period_end = str(row.get("periodEnd") or "")
@@ -265,8 +284,13 @@ def main() -> int:
                 by_period[period_end] = row
         selected = sorted(by_period.values(), key=lambda r: str(r.get("periodEnd") or ""), reverse=True)[:args.history_years]
         if not selected:
+            OUT.mkdir(parents=True, exist_ok=True)
+            manifest = {"requested_code": code, "requested_periods": args.history_years, "status": "incomplete",
+                        "periods": [], "gaps": [], "failed_scan_dates": [d.isoformat() for d in failed_days],
+                        "amendments": [], "reason": "no_original_annual_report_found"}
+            (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"ERROR: no annual-report CSV filings found for securities code {code}.", file=sys.stderr)
-            return 2
+            return 3
         print(f"Historical scan: {len(scan_days)} weekdays queried; {len(historical_matches)} matching records; {len(selected)} fiscal periods selected.", flush=True)
         manifest = {"requested_code": code, "requested_periods": args.history_years, "status": "incomplete", "periods": [], "gaps": [], "failed_scan_dates": [d.isoformat() for d in failed_days], "amendments": []}
         for row in historical_matches + matches:
