@@ -21,14 +21,18 @@ CONCEPTS = {
     ("sales", "jppfs_cor:NetSales"),
     ("sales", "jpcrp_cor:NetSalesSummaryOfBusinessResults"),
     ("operating_profit", "jppfs_cor:OperatingIncome"),
-    ("operating_profit", "jpcrp_cor:OperatingIncomeLossSummaryOfBusinessResults"),
+    ("operating_profit", "jpigp_cor:OperatingProfitLossIFRS"),
+    ("operating_profit", "jpcrp_cor:OperatingIncomeLossUSGAAPSummaryOfBusinessResults"),
     ("ordinary_profit", "jppfs_cor:OrdinaryIncome"),
     ("ordinary_profit", "jpcrp_cor:OrdinaryIncomeLossSummaryOfBusinessResults"),
     ("profit", "jppfs_cor:ProfitLoss"),
+    ("profit", "jpcrp_cor:NetIncomeLossSummaryOfBusinessResults"),
     ("profit", "jpcrp_cor:ProfitLossAttributableToOwnersOfParentSummaryOfBusinessResults"),
     ("eps", "jpcrp_cor:BasicEarningsLossPerShareSummaryOfBusinessResults"),
     ("ocf", "jpcrp_cor:NetCashProvidedByUsedInOperatingActivitiesSummaryOfBusinessResults"),
+    ("ocf", "jppfs_cor:NetCashProvidedByUsedInOperatingActivities"),
     ("icf", "jpcrp_cor:NetCashProvidedByUsedInInvestingActivitiesSummaryOfBusinessResults"),
+    ("icf", "jppfs_cor:NetCashProvidedByUsedInInvestmentActivities"),
 }
 CONTEXTS = {
     f"{prefix}{kind}"
