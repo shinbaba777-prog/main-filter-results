@@ -1,0 +1,45 @@
+{
+  "requested_code": "4406",
+  "requested_periods": 5,
+  "status": "complete",
+  "periods": [
+    {
+      "periodEnd": "2022-03-31",
+      "docID": "S100OK43",
+      "status": "downloaded",
+      "reason": "",
+      "file": "44060_S100OK43_xbrl_csv.zip"
+    },
+    {
+      "periodEnd": "2023-03-31",
+      "docID": "S100R83V",
+      "status": "downloaded",
+      "reason": "",
+      "file": "44060_S100R83V_xbrl_csv.zip"
+    },
+    {
+      "periodEnd": "2024-03-31",
+      "docID": "S100TUAP",
+      "status": "downloaded",
+      "reason": "",
+      "file": "44060_S100TUAP_xbrl_csv.zip"
+    },
+    {
+      "periodEnd": "2025-03-31",
+      "docID": "S100W17N",
+      "status": "downloaded",
+      "reason": "",
+      "file": "44060_S100W17N_xbrl_csv.zip"
+    },
+    {
+      "periodEnd": "2026-03-31",
+      "docID": "S100YGXD",
+      "status": "downloaded",
+      "reason": "",
+      "file": "44060_S100YGXD_xbrl_csv.zip"
+    }
+  ],
+  "gaps": [],
+  "failed_scan_dates": [],
+  "amendments": []
+}
