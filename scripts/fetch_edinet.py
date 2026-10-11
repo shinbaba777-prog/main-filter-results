@@ -204,7 +204,7 @@ def main() -> int:
     rows = list(unique.values())
     annual = [r for r in rows if str(r.get("docTypeCode", "")) in ANNUAL_REPORT_CODES]
     accepted_codes = {code, code + "0"} if len(code) == 4 and code.isdigit() else ({code} if code else set())
-    matches = [r for r in annual if normalize_code(r.get("secCode")) in accepted_codes and str(r.get("csvFlag", "")) == "1" and str(r.get("legalStatus", "1")) in {"1", "2"}]
+    matches = [r for r in annual if str(r.get("docTypeCode", "")) == "120" and normalize_code(r.get("secCode")) in accepted_codes and str(r.get("csvFlag", "")) == "1" and str(r.get("legalStatus", "1")) in {"1", "2"} and str(r.get("withdrawalStatus", "0")) not in {"1", "2"} and str(r.get("docInfoEditStatus", "1")) != "2"]
     print(f"Recent EDINET filing records: {len(rows)}; annual-report candidates: {len(annual)}")
 
     if args.history_years:
