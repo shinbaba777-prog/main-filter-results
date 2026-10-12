@@ -33,8 +33,10 @@ class EdinetMetricsDraftTests(unittest.TestCase):
         for rate in rates:
             self.assertAlmostEqual(rate, 0.1)
 
-    def test_eps_yoy_returns_missing_when_prior_eps_nonpositive(self):
-        self.assertIsNone(yoy_series([-1, 10, 12, 14, 16]))
+    def test_eps_yoy_marks_nonpositive_base_as_missing(self):
+        rates = yoy_series([-1, 10, 12, 14, 16])
+        self.assertIsNone(rates[0])
+        self.assertAlmostEqual(rates[1], 0.2)
 
     def test_only_explicitly_approved_rows_are_used(self):
         path = self.write_queue([
