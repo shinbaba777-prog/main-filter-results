@@ -45,6 +45,12 @@ class EdinetMetricsDraftTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid numeric"):
             load_approved(path, "1234")
 
+
+    def test_approved_row_with_unresolved_reason_is_rejected(self):
+        path = self.write_queue([self.row(review_reason="CHECK_FILING_AND_DUPLICATES")])
+        with self.assertRaisesRegex(ValueError, "unresolved review_reason"):
+            load_approved(path, "1234")
+
     def test_unreviewed_rows_are_not_used(self):
         path = self.write_queue([self.row(review_status="MANUAL_REVIEW_REQUIRED")])
         self.assertEqual(load_approved(path, "1234"), {})
