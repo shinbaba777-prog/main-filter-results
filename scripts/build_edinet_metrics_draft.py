@@ -28,6 +28,14 @@ def num(value):
         return None
 
 
+def yoy_series(values):
+    """Return up to four year-over-year rates; never confuse raw EPS deltas with growth."""
+    out = []
+    for a, b in zip(values, values[1:]):
+        out.append(None if a is None or b is None or a <= 0 else b / a - 1)
+    return out[-4:] if len(out) >= 4 else None
+
+
 def load_approved(path: Path, code: str):
     if not path.exists():
         raise ValueError(f"Missing review queue: {path}")
@@ -101,12 +109,6 @@ def main():
     def latest_yoy(values):
         a,b=values[-2],values[-1]
         return None if a is None or b is None or a <= 0 else b/a-1
-    def yoy_series(values):
-        # Return up to four year-over-year rates, oldest first; never use raw EPS deltas.
-        out=[]
-        for a,b in zip(values, values[1:]):
-            out.append(None if a is None or b is None or a <= 0 else b/a-1)
-        return out[-4:] if len(out) >= 4 else None
     metrics = {
       "growth": {"sales_long_cagr": growth("sales","4期前","当期",4), "sales_3y_cagr": growth("sales","3期前","当期",3),
                  "sales_yoy": latest_yoy(sales), "sales_forecast_growth": None,
