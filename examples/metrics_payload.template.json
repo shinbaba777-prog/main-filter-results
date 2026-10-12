@@ -90,15 +90,15 @@
     }
   },
   "buy_block_inputs": {
-    "shorts_direction_zero": false,
-    "shorts_applicable": false,
-    "ocf_ni_zero": false,
-    "dilution_zero": false,
-    "roic_below_h": false,
-    "roic_unavailable": true,
-    "short_type_a": false,
-    "peg_over_2": false,
-    "industry_per_over_130": false,
+    "shorts_direction_zero": null,
+    "shorts_applicable": null,
+    "ocf_ni_zero": null,
+    "dilution_zero": null,
+    "roic_below_h": null,
+    "roic_unavailable": null,
+    "short_type_a": null,
+    "peg_over_2": null,
+    "industry_per_over_130": null,
     "base_upside_pct": null
   }
 }
