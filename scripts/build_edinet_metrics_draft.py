@@ -30,10 +30,10 @@ def num(value):
 
 def yoy_series(values):
     """Return up to four year-over-year rates; never confuse raw EPS deltas with growth."""
-    out = []
-    for a, b in zip(values, values[1:]):
-        out.append(None if a is None or b is None or a <= 0 else b / a - 1)
-    return out[-4:] if len(out) >= 4 else None
+    if len(values) < 5 or any(a is None or b is None or a <= 0 for a, b in zip(values, values[1:])):
+        return None
+    out = [(b / a) - 1 for a, b in zip(values, values[1:])]
+    return out[-4:]
 
 
 def load_approved(path: Path, code: str):
