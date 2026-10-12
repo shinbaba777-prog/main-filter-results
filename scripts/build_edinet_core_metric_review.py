@@ -46,6 +46,19 @@ FIELDS = [
     "review_status", "review_reason", "duplicate_count", "source_row_numbers", "raw_row_json",
 ]
 
+def is_annual_context(context: str) -> bool:
+    """Accept standard annual contexts and annual business-results summary member contexts.
+
+    Member contexts remain review-only; they are never treated as consolidated facts.
+    """
+    for base in CONTEXTS:
+        if context == base:
+            return True
+        if context.startswith(base + "_NonConsolidatedMember"):
+            return True
+    return False
+
+
 def main():
     if not SOURCE.exists():
         raise SystemExit(f"Missing input: {SOURCE}")
@@ -66,16 +79,18 @@ def main():
             if (metric, concept) not in CONCEPTS:
                 counts["excluded_concept_or_metric"] += 1
                 continue
-            if context not in CONTEXTS:
+            is_summary_concept = concept.startswith("jpcrp_cor:") and concept.endswith("SummaryOfBusinessResults")
+            if not is_annual_context(context):
                 counts["excluded_nonannual_or_member_context"] += 1
                 continue
+            # Summary-table facts using a non-consolidated member are retained only
+            # as explicit manual-review candidates. They must not be auto-approved.
             # Scope other than consolidated is retained only for manual review
             # for these explicitly identified cash-flow summary concepts.
             scope_unclear = scope != "連結"
             # Business-results summary concepts commonly carry the EDINET scope
             # label "その他". Keep these exact, allowlisted concepts for review,
             # but explicitly flag scope as unverified instead of assuming consolidated.
-            is_summary_concept = concept.startswith("jpcrp_cor:") and concept.endswith("SummaryOfBusinessResults")
             if scope_unclear and not is_summary_concept:
                 counts["excluded_nonconsolidated_or_unclear_scope"] += 1
                 continue
