@@ -1,0 +1,104 @@
+{
+  "code": "0000",
+  "company": "会社名",
+  "analysis_date": "YYYY-MM-DD",
+  "earnings_date": "",
+  "earnings_text": "",
+  "holding": false,
+  "notes": "",
+  "metrics": {
+    "growth": {
+      "sales_long_cagr": null,
+      "sales_3y_cagr": null,
+      "sales_yoy": null,
+      "sales_forecast_growth": null,
+      "operating_profit_long_cagr": null
+    },
+    "profitability": {
+      "operating_margin": null,
+      "operating_margin_deltas": null,
+      "gross_margin_deltas": null,
+      "roa": null
+    },
+    "roic_capital": {
+      "roic": null,
+      "roic_uncomputable": false,
+      "roe": null,
+      "incremental_roic": null,
+      "incremental_roic_uncomputable": false,
+      "nopat_change": null,
+      "roic_deltas": null,
+      "reinvestment_rate": null,
+      "capital_cost_h": null
+    },
+    "finance_cf": {
+      "ocf_ni_3y": null,
+      "ocf_negative_two_consecutive": false,
+      "net_income_3y": null,
+      "ocf_3y": null,
+      "net_debt_ebitda": null,
+      "net_cash": false,
+      "share_count_increase_3y": null,
+      "share_count_increased_three_years": false,
+      "equity_ratio": null,
+      "fcf_3y_sum": null,
+      "fcf_latest": null
+    },
+    "eps_growth": {
+      "eps_long_cagr": null,
+      "eps_yoy": null,
+      "eps_forecast_growth": null,
+      "eps_yoy_last4": null
+    },
+    "valuation": {
+      "peg": null,
+      "peg_proxy": null,
+      "industry_relative_per": null,
+      "actual_eps_nonpositive": false,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ebitda_nonpositive": false
+    },
+    "competitive_advantage": {
+      "evidence_backed_advantage_types": null,
+      "roic_or_roe_last3": null,
+      "management_ownership": null,
+      "controlling_owner": null
+    },
+    "subsidiaries_ma": {
+      "no_material_subsidiaries_and_no_ma_5y": false,
+      "material_impairment_ratio": null,
+      "loss_subsidiary_loss_vs_op_profit": null,
+      "goodwill_plus_intangibles_to_equity": null,
+      "goodwill_to_equity": null,
+      "post_ma_op_margin_change": null,
+      "material_impairment": false
+    },
+    "shorts_supply": {
+      "no_public_short_positions_90d": false,
+      "only_one_short_observation": false,
+      "short_ratio_start": null,
+      "short_ratio_end": null,
+      "comparison_days": null,
+      "new_institutions": null,
+      "post_earnings_30d_change": null
+    },
+    "ir_reaction": {
+      "target_ir_count_12m": null,
+      "eligible_ir_count_12m": null,
+      "eligible_excess_returns": null
+    }
+  },
+  "buy_block_inputs": {
+    "shorts_direction_zero": false,
+    "shorts_applicable": false,
+    "ocf_ni_zero": false,
+    "dilution_zero": false,
+    "roic_below_h": false,
+    "roic_unavailable": true,
+    "short_type_a": false,
+    "peg_over_2": false,
+    "industry_per_over_130": false,
+    "base_upside_pct": null
+  }
+}
