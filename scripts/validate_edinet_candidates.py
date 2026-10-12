@@ -22,14 +22,18 @@ def metric_is_eps(row):
     return row.get("candidate_metric", "") == "eps"
 
 
-def is_current_year_context(context):
-    """Accept annual current-year contexts with taxonomy member suffixes.
+def is_annual_context(context):
+    """Recognize current and prior annual contexts, including member suffixes.
 
-    This only removes a false context warning; it does not approve the metric.
+    Historical annual rows are valid candidates for multi-year review. This
+    checks context shape only and never approves a fact for investment scoring.
     """
-    return context in ("CurrentYearDuration", "CurrentYearInstant") or context.startswith(
-        ("CurrentYearDuration_", "CurrentYearInstant_")
-    )
+    for prefix in ("CurrentYear", "Prior1Year", "Prior2Year", "Prior3Year", "Prior4Year"):
+        for kind in ("Duration", "Instant"):
+            base = prefix + kind
+            if context == base or context.startswith(base + "_"):
+                return True
+    return False
 
 def main():
     if not SOURCE.exists():
@@ -50,10 +54,10 @@ def main():
             unit_label = raw.get("単位", "")
             relative_year = raw.get("相対年度", "")
             flags = []
-            # Accept current-year contexts with taxonomy member suffixes, but keep
-            # consolidation-scope checks separate and require manual review.
-            if not is_current_year_context(context):
-                flags.append("NOT_CURRENT_YEAR_CONTEXT")
+            # Prior-year annual contexts are expected in a multi-year review.
+            # Flag only contexts that are not recognized annual current/prior periods.
+            if not is_annual_context(context):
+                flags.append("NON_ANNUAL_CONTEXT")
             if not concept or ":" not in concept:
                 flags.append("CONCEPT_ID_UNVERIFIED")
             if scope not in ("連結", "個別"):
