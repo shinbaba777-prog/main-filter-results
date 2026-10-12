@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 from rubric_scoring import build_items
+from validate_block_inputs import validate_buy_block_inputs
 
 def main():
     if len(sys.argv) != 3:
@@ -23,6 +24,12 @@ def main():
         if key not in src:
             print(f"Missing required field: {key}",file=sys.stderr)
             return 2
+    errors=validate_buy_block_inputs(src["buy_block_inputs"])
+    if errors:
+        print("BUY-block input validation failed:",file=sys.stderr)
+        for error in errors:
+            print(f"- {error}",file=sys.stderr)
+        return 2
     result={k:src[k] for k in ("code","company","analysis_date","earnings_date","earnings_text","holding","notes","buy_block_inputs") if k in src}
     result["items"]=build_items(src["metrics"])
     result["filter_version"]="2.3.1"
