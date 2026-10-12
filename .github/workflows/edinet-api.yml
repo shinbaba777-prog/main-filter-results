@@ -91,9 +91,8 @@ jobs:
       - name: Commit refreshed EDINET data
         if: ${{ always() }}
         run: |
-          if [ "${{ steps.fetch.outcome }}" != "success" ]; then
-            rm -rf data/edinet/extracted
-          fi
+          # Preserve previously extracted/reviewed data if the latest metadata fetch fails.
+          # A failed refresh must never delete the existing review queue.
           if [ -f data/edinet/download_manifest.json ]; then
             python -c 'import json; from pathlib import Path; m=json.loads(Path("data/edinet/download_manifest.json").read_text(encoding="utf-8")); print("## EDINET download manifest"); print("| Period end | Document ID | Status | Reason |"); print("|---|---|---|---|"); [print("| " + str(x.get("periodEnd","")) + " | " + str(x.get("docID","")) + " | " + str(x.get("status","")) + " | " + str(x.get("reason","")) + " |") for x in m.get("periods",[])]; print(); print("**Overall status:** " + str(m.get("status","unknown"))); print("**Gaps:** " + json.dumps(m.get("gaps",[]), ensure_ascii=False))' >> "$GITHUB_STEP_SUMMARY"
           fi
