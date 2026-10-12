@@ -26,7 +26,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("payload", help="JSON input file with source-verified rubric items")
     parser.add_argument("--dry-run", action="store_true", help="print result without changing index.csv")
+    parser.add_argument("--index", default=str(CSV_PATH), help="CSV destination (defaults to repository index.csv)")
     args = parser.parse_args()
+    index_path = Path(args.index)
     path = Path(args.payload)
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -72,8 +74,8 @@ def main() -> int:
         return 2
 
     existing = []
-    if CSV_PATH.exists():
-        with CSV_PATH.open("r", encoding="utf-8-sig", newline="") as f:
+    if index_path.exists():
+        with index_path.open("r", encoding="utf-8-sig", newline="") as f:
             reader = csv.DictReader(f)
             if reader.fieldnames != FIELDS:
                 print(f"index.csv header mismatch: {reader.fieldnames}", file=sys.stderr)
@@ -90,12 +92,13 @@ def main() -> int:
     output = {"record": row, "scoring": result}
     print(json.dumps(output, ensure_ascii=False, indent=2))
     if not args.dry_run:
-        with CSV_PATH.open("a", encoding="utf-8", newline="") as f:
+        index_path.parent.mkdir(parents=True, exist_ok=True)
+        with index_path.open("a", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=FIELDS, lineterminator="\n")
-            if not existing and CSV_PATH.stat().st_size == 0:
+            if not existing and index_path.stat().st_size == 0:
                 writer.writeheader()
             writer.writerow(row)
-        print(f"Appended to {CSV_PATH}")
+        print(f"Appended to {index_path}")
     return 0
 
 if __name__ == "__main__":
