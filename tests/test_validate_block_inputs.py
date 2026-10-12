@@ -41,10 +41,15 @@ class BuyBlockInputValidationTests(unittest.TestCase):
         values["roic_below_h"] = True
         self.assertTrue(any("cannot both be true" in e for e in validate_buy_block_inputs(values)))
 
-    def test_scenario_can_be_explicitly_unassessed(self):
+    def test_unassessed_scenario_is_rejected(self):
         values = self.complete()
         values["base_upside_pct"] = None
-        self.assertEqual(validate_buy_block_inputs(values), [])
+        self.assertTrue(any("must be a finite number" in e for e in validate_buy_block_inputs(values)))
+
+    def test_non_finite_scenario_is_rejected(self):
+        values = self.complete()
+        values["base_upside_pct"] = "nan"
+        self.assertTrue(any("must be a finite number" in e for e in validate_buy_block_inputs(values)))
 
 if __name__ == "__main__":
     unittest.main()
