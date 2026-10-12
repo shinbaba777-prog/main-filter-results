@@ -2,8 +2,8 @@
 """Validate mandatory BUY-block inputs without silently treating unknowns as false.
 
 Use this before scoring/recording. Booleans must be explicitly source-checked;
-base_upside_pct may be null only to represent an unassessed scenario and will be
-reported as an unresolved block condition by the caller.
+base_upside_pct must be a finite numeric value so the +20% BUY-block condition
+cannot silently pass while the Base scenario remains unassessed.
 """
 from __future__ import annotations
 
@@ -30,11 +30,14 @@ def validate_buy_block_inputs(inputs: object) -> list[str]:
             errors.append(f"buy_block_inputs.{key} must be true/false after verification")
     if "base_upside_pct" not in inputs:
         errors.append("buy_block_inputs.base_upside_pct is absent; provide a value or explicit null")
-    elif inputs["base_upside_pct"] is not None:
+    else:
         try:
-            float(inputs["base_upside_pct"])
+            import math
+            value = float(inputs["base_upside_pct"])
+            if not math.isfinite(value):
+                raise ValueError("not finite")
         except (TypeError, ValueError):
-            errors.append("buy_block_inputs.base_upside_pct must be numeric or null")
+            errors.append("buy_block_inputs.base_upside_pct must be a finite number; assess the Base scenario before scoring")
     if inputs.get("roic_unavailable") is True and inputs.get("roic_below_h") is True:
         errors.append("ROIC unavailable and ROIC below capital cost cannot both be true")
     return errors
