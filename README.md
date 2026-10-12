@@ -81,3 +81,12 @@ GitHub Pagesは `index.csv` から公開ページを自動生成します。
 ## EDINETデータ取得・レビュー
 
 EDINET APIによる提出書類取得、XBRL CSV抽出、候補検証、レビューキューの使い方と安全上の注意は [`EDINET_REVIEW_GUIDE.md`](EDINET_REVIEW_GUIDE.md) を参照してください。抽出候補は自動承認せず、一次資料と照合するまで正式採点には使用しません。
+
+
+## メインフィルター2.3.1の統合プロトコル
+
+データ取得から検証・採点・成績記録までの標準手順は [MAIN_FILTER_2.3.1_INTEGRATION.md](MAIN_FILTER_2.3.1_INTEGRATION.md) に定義しています。既存の配点・STAGE 1通過条件・欠損ルール・BUYブロックは変更しません。
+
+重要：EDINET抽出候補は未検証のまま採点に使用しません。候補件数を欠損指標数と同一視せず、一次資料と照合できた値のみ採点に使用します。正式採点完了後に index.csv へ記録し、Pagesデプロイ成功まで確認します。
+
+現在のGitHub ActionsはEDINETデータ取得・抽出とGitHub Pages公開を支援しますが、ChatGPTの正式採点結果を自動で取り込む連携や、2.3.1全配点を自動計算する採点エンジンはまだ別途実装が必要です。
