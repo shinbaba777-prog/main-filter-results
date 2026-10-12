@@ -43,7 +43,7 @@ def load_approved(path: Path, code: str):
                 continue
             if row.get("review_status") != "APPROVED":
                 continue
-            if row.get("review_reason") not in {"APPROVED_SOURCE_VERIFIED", "CHECK_FILING_AND_DUPLICATES"}:
+            if row.get("review_reason") != "APPROVED_SOURCE_VERIFIED":
                 raise ValueError("Approved row has an unresolved review_reason; resolve it explicitly first")
             metric, year = row.get("candidate_metric", ""), row.get("relative_year", "")
             if metric not in VALUE_METRICS or year not in YEAR_ORDER:
@@ -101,6 +101,12 @@ def main():
     def latest_yoy(values):
         a,b=values[-2],values[-1]
         return None if a is None or b is None or a <= 0 else b/a-1
+    def yoy_series(values):
+        # Return up to four year-over-year rates, oldest first; never use raw EPS deltas.
+        out=[]
+        for a,b in zip(values, values[1:]):
+            out.append(None if a is None or b is None or a <= 0 else b/a-1)
+        return out[-4:] if len(out) >= 4 else None
     metrics = {
       "growth": {"sales_long_cagr": growth("sales","4期前","当期",4), "sales_3y_cagr": growth("sales","3期前","当期",3),
                  "sales_yoy": latest_yoy(sales), "sales_forecast_growth": None,
@@ -117,7 +123,7 @@ def main():
                      "ocf_3y": None, "net_debt_ebitda": None, "net_cash": False, "share_count_increase_3y": None,
                      "share_count_increased_three_years": False, "equity_ratio": None, "fcf_3y_sum": None, "fcf_latest": None},
       "eps_growth": {"eps_long_cagr": growth("eps","4期前","当期",4), "eps_yoy": latest_yoy(eps),
-                     "eps_forecast_growth": None, "eps_yoy_last4": deltas(eps[-4:]) if all(x is not None for x in eps[-4:]) else None},
+                     "eps_forecast_growth": None, "eps_yoy_last4": yoy_series(eps)},
       "valuation": {"peg": None, "peg_proxy": None, "industry_relative_per": None, "actual_eps_nonpositive": eps[-1] is not None and eps[-1] <= 0,
                     "fcf_yield": None, "ev_ebitda": None, "ebitda_nonpositive": False},
       "competitive_advantage": {"evidence_backed_advantage_types": None, "roic_or_roe_last3": None, "management_ownership": None, "controlling_owner": None},
