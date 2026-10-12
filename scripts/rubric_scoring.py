@@ -11,7 +11,7 @@ def band(value: Optional[float], thresholds: list[tuple[float, float]], missing_
     """Return points for ascending lower-bound thresholds; None means missing."""
     if value is None:
         return None, "missing"
-    for lower, points in reversed(thresholds):
+    for lower, points in thresholds:
         if value >= lower:
             return points, "scored"
     return missing_points, "scored"
