@@ -130,3 +130,98 @@ def finance_cf_score(metrics: dict) -> list[dict]:
         p=2 if all(positive) else 1 if any(positive) else 0;s="scored"
     out.append({"key":"fcf_stability","group":"finance_cf","points":p,"max_points":2,"status":s,"evidence":f"fcf_3y_sum={fcf!r}; latest={latest_fcf!r}","source":metrics.get("fcf_source","")})
     return out
+
+
+def valuation_score(m: dict) -> list[dict]:
+    """5-6 Valuation: ratios are decimals (130% = 1.30)."""
+    out=[]
+    peg=m.get("peg")
+    if peg is None: peg=m.get("peg_proxy")
+    if peg is None: p=None;s="missing"
+    else:
+        p=6 if peg<=.75 else 5 if peg<=1 else 4 if peg<=1.25 else 3 if peg<=1.5 else 2 if peg<=2 else 1 if peg<=3 else 0
+        s="scored"
+    out.append({"key":"peg","group":"valuation","points":p,"max_points":6,"status":s,"evidence":f"peg_or_proxy={peg!r}","source":m.get("peg_source","")})
+    rel=m.get("industry_relative_per")
+    if rel is None: p=None;s="missing"
+    elif m.get("actual_eps_nonpositive"): p=0;s="scored"
+    else:
+        p=4 if rel<=.7 else 3 if rel<=.9 else 2 if rel<=1.1 else 1 if rel<=1.3 else 0
+        s="scored"
+    out.append({"key":"industry_relative_per","group":"valuation","points":p,"max_points":4,"status":s,"evidence":f"relative_per={rel!r}; actual_eps_nonpositive={m.get('actual_eps_nonpositive')}","source":m.get("industry_relative_per_source","")})
+    y=m.get("fcf_yield")
+    p,s=band(y,[(.05,3),(.03,2),(.01,1)])
+    out.append({"key":"fcf_yield","group":"valuation","points":p,"max_points":3,"status":s,"evidence":f"fcf_yield={y!r}","source":m.get("fcf_yield_source","")})
+    ev=m.get("ev_ebitda")
+    if ev is None: p=None;s="missing"
+    elif m.get("ebitda_nonpositive") or ev>15: p=0;s="scored"
+    elif ev<=8: p=2;s="scored"
+    else: p=1;s="scored"
+    out.append({"key":"ev_ebitda","group":"valuation","points":p,"max_points":2,"status":s,"evidence":f"ev_ebitda={ev!r}","source":m.get("ev_ebitda_source","")})
+    return out
+
+def competitive_advantage_score(m: dict) -> list[dict]:
+    types=m.get("evidence_backed_advantage_types")
+    if types is None: p=None;s="missing";ev="一次資料＋直接裏付け定量値が未確認"
+    else:
+        count=len(set(types)); r=m.get("roic_or_roe_last3")
+        p=0 if count==0 else 1 if count==1 else 3 if r is not None and len(r)>=3 and all(x is not None and x>=.15 for x in r[:3]) else 2
+        s="scored";ev=f"types={types!r}; ROIC/ROE last3={r!r}"
+    out=[{"key":"competitive_advantage","group":"competitive_advantage","points":p,"max_points":3,"status":s,"evidence":ev,"source":m.get("advantage_source","")}]
+    p,s=band(m.get("management_ownership"),[(.10,2),(.05,1)])
+    out.append({"key":"management_ownership","group":"competitive_advantage","points":p,"max_points":2,"status":s,"evidence":f"management_ownership={m.get('management_ownership')!r}; controlling_owner={m.get('controlling_owner')}","source":m.get("management_ownership_source","")})
+    return out
+
+def subsidiaries_ma_score(m: dict) -> list[dict]:
+    if m.get("no_material_subsidiaries_and_no_ma_5y") is True:
+        return [{"key":"subsidiaries_ma","group":"subsidiaries_ma","points":None,"max_points":3,"status":"not_applicable","evidence":"重要子会社なし、直近5年M&A実績なし","source":m.get("source","")}]
+    keys=("material_impairment_ratio","loss_subsidiary_loss_vs_op_profit","goodwill_plus_intangibles_to_equity","goodwill_to_equity","post_ma_op_margin_change")
+    if any(m.get(k) is None for k in keys):
+        p=None;s="missing";e="M&A・子会社の必須指標不足"
+    elif m["material_impairment_ratio"]>=.01 or m["loss_subsidiary_loss_vs_op_profit"]>=.20:
+        p=0;s="scored";e="重要減損または赤字子会社等の損失が基準以上"
+    elif m["goodwill_plus_intangibles_to_equity"]>=.50 or m["post_ma_op_margin_change"]<=-.005:
+        p=1;s="scored";e="のれん等50%以上またはM&A後営業利益率が0.5pt以上低下"
+    elif .20<=m["goodwill_to_equity"]<.50 and not m.get("material_impairment",False):
+        p=2;s="scored";e="のれん20〜50%、重要減損なし"
+    elif m["goodwill_to_equity"]<.20 and not m.get("material_impairment",False) and m["post_ma_op_margin_change"]>=0:
+        p=3;s="scored";e="のれん20%未満、重要減損なし、営業利益率低下なし"
+    else:
+        p=None;s="missing";e="仕様表の条件を確定できず。一次資料確認が必要"
+    return [{"key":"subsidiaries_ma","group":"subsidiaries_ma","points":p,"max_points":3,"status":s,"evidence":e,"source":m.get("source","")}]
+
+def shorts_supply_score(m: dict) -> list[dict]:
+    if m.get("no_public_short_positions_90d") is True:
+        return [{"key":"shorts_supply","group":"shorts_supply","points":None,"max_points":7,"status":"not_applicable","evidence":"90日間に0.5%以上の公表残高なし（0.5%未満は確認不能）","source":m.get("source","")}]
+    out=[]; start=m.get("short_ratio_start"); end=m.get("short_ratio_end"); entrants=m.get("new_institutions",0)
+    if m.get("only_one_short_observation") or start is None or end is None or m.get("comparison_days",0)<20:
+        d=None;s="missing";e="比較可能な2時点（20営業日以上）が不足"
+    elif start==0 and end>0:
+        d=1 if entrants==1 else 0 if entrants>=2 else None;s="scored" if d is not None else "missing";e=f"新規参入機関数={entrants}"
+    elif end==0 or (start-end)/start>=.50: d=4;s="scored";e=f"{start}→{end}"
+    elif (start-end)/start>=.20: d=3;s="scored";e=f"{start}→{end}"
+    elif abs((end-start)/start)<.20: d=2;s="scored";e=f"{start}→{end}"
+    elif (end-start)/start<.50: d=1;s="scored";e=f"{start}→{end}"
+    else: d=0;s="scored";e=f"{start}→{end}; entrants={entrants}"
+    out.append({"key":"shorts_direction","group":"shorts_supply","points":d,"max_points":4,"status":s,"evidence":e,"source":m.get("direction_source","")})
+    p,s=band(end,[(.03,0),(.01,1)])
+    if end is not None and end<.01: p=2;s="scored"
+    out.append({"key":"shorts_concentration","group":"shorts_supply","points":p,"max_points":2,"status":s,"evidence":f"base_date_total_ratio={end!r}","source":m.get("concentration_source","")})
+    post=m.get("post_earnings_30d_change")
+    p=None if post is None else (1 if post<=0 else 0);s="missing" if post is None else "scored"
+    out.append({"key":"shorts_post_earnings","group":"shorts_supply","points":p,"max_points":1,"status":s,"evidence":f"30-day change={post!r}","source":m.get("post_earnings_source","")})
+    return out
+
+def ir_reaction_score(m: dict) -> list[dict]:
+    target=m.get("target_ir_count_12m",0); eligible=m.get("eligible_ir_count_12m",0)
+    if target==0:
+        p=None;s="not_applicable";e="対象IRが直近12ヶ月ゼロ"
+    elif eligible==0:
+        p=None;s="missing";e="対象IRあり、成熟・非重複の採点可能IRなし"
+    else:
+        total=0
+        for ret in m.get("eligible_excess_returns",[]):
+            total += 2 if ret>=.10 else 1 if ret>=.03 else 0 if ret>-.03 else -1 if ret>-.10 else -2
+        p=5 if total>=4 else 4 if total>=2 else 3 if total>=0 else 2 if total>=-2 else 1 if total>=-4 else 0
+        s="scored";e=f"eligible={eligible}; returns={m.get('eligible_excess_returns')!r}; adjustment_sum={total}"
+    return [{"key":"ir_reaction","group":"ir_reaction","points":p,"max_points":5,"status":s,"evidence":e,"source":m.get("source","")}]
