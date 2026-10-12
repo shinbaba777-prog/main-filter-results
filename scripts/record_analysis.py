@@ -91,7 +91,7 @@ def main() -> int:
     print(json.dumps(output, ensure_ascii=False, indent=2))
     if not args.dry_run:
         with CSV_PATH.open("a", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDS, lineterminator="\\n")
+            writer = csv.DictWriter(f, fieldnames=FIELDS, lineterminator="\n")
             if not existing and CSV_PATH.stat().st_size == 0:
                 writer.writeheader()
             writer.writerow(row)
