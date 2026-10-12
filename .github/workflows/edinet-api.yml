@@ -88,6 +88,19 @@ jobs:
         if: ${{ steps.fetch.outcome == 'success' && (inputs.download_csv || inputs.download_history) }}
         run: python scripts/build_edinet_core_metric_review.py
 
+      - name: Publish EDINET review files as a downloadable artifact
+        if: ${{ steps.fetch.outcome == 'success' && (inputs.download_csv || inputs.download_history) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: edinet-review-${{ github.run_id }}
+          path: |
+            data/edinet/download_manifest.json
+            data/edinet/extracted/financial_metric_candidates.csv
+            data/edinet/extracted/core_metric_review_queue.csv
+            data/edinet/extracted/core_metric_review_queue_summary.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Commit refreshed EDINET data
         if: ${{ always() }}
         run: |
