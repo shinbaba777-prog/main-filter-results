@@ -250,9 +250,10 @@ def roic_capital_score(m: dict) -> list[dict]:
         p=2 if improve>=2 else 0 if decline>=2 else 1;s="scored";e=f"deltas={deltas[:3]!r}"
     out.append({"key":"roic_direction","group":"roic_capital","points":p,"max_points":2,"status":s,"evidence":e,"source":m.get("roic_deltas_source","")})
     reinvest=m.get("reinvestment_rate"); h=m.get("capital_cost_h")
-    if reinvest is None or h is None or used is None: p=None;s="missing"
-    elif used>h and reinvest>=.30: p=2;s="scored"
-    elif used>h and reinvest>=.10: p=1;s="scored"
+    # The spec compares ROIC with capital cost; ROE proxy is not a substitute here.
+    if reinvest is None or h is None or roic is None or m.get("roic_uncomputable"): p=None;s="missing"
+    elif roic>h and reinvest>=.30: p=2;s="scored"
+    elif roic>h and reinvest>=.10: p=1;s="scored"
     else: p=0;s="scored"
     out.append({"key":"reinvestment_rate","group":"roic_capital","points":p,"max_points":2,"status":s,"evidence":f"rate={reinvest!r}; capital_cost={h!r}; ROIC/ROE={used!r}","source":m.get("reinvestment_rate_source","")})
     roe=m.get("roe")
