@@ -1,0 +1,56 @@
+{
+  "generated_at_utc": "2026-10-12T13:15:19.006162+00:00",
+  "source_zips": [
+    "44140_S100ODYT_xbrl_csv.zip",
+    "44140_S100R2I8_xbrl_csv.zip",
+    "44140_S100TPF0_xbrl_csv.zip",
+    "44140_S100W10D_xbrl_csv.zip",
+    "44140_S100YG80_xbrl_csv.zip"
+  ],
+  "numeric_rows": 2304,
+  "candidate_metric_rows": 369,
+  "skipped_csv_members": [],
+  "fiscal_periods": [
+    {
+      "periodEnd": "2022-03-31",
+      "docID": "S100ODYT",
+      "status": "downloaded",
+      "reason": "",
+      "file": "44140_S100ODYT_xbrl_csv.zip"
+    },
+    {
+      "periodEnd": "2023-03-31",
+      "docID": "S100R2I8",
+      "status": "downloaded",
+      "reason": "",
+      "file": "44140_S100R2I8_xbrl_csv.zip"
+    },
+    {
+      "periodEnd": "2024-03-31",
+      "docID": "S100TPF0",
+      "status": "downloaded",
+      "reason": "",
+      "file": "44140_S100TPF0_xbrl_csv.zip"
+    },
+    {
+      "periodEnd": "2025-03-31",
+      "docID": "S100W10D",
+      "status": "downloaded",
+      "reason": "",
+      "file": "44140_S100W10D_xbrl_csv.zip"
+    },
+    {
+      "periodEnd": "2026-03-31",
+      "docID": "S100YG80",
+      "status": "downloaded",
+      "reason": "",
+      "file": "44140_S100YG80_xbrl_csv.zip"
+    }
+  ],
+  "amendments": [],
+  "outputs": [
+    "data/edinet/extracted/xbrl_numeric_rows.csv",
+    "data/edinet/extracted/financial_metric_candidates.csv"
+  ],
+  "warning": "Heuristic candidate mappings only. Verify concept, period, unit, consolidation scope, and sign before investment scoring."
+}
