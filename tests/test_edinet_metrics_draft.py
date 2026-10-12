@@ -2,7 +2,7 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
-from scripts.build_edinet_metrics_draft import load_approved
+from scripts.build_edinet_metrics_draft import load_approved, yoy_series
 
 
 class EdinetMetricsDraftTests(unittest.TestCase):
@@ -26,6 +26,15 @@ class EdinetMetricsDraftTests(unittest.TestCase):
                "context_id": "CurrentYearDuration", "unit_id": "JPY", "row_number": "12"}
         row.update(overrides)
         return row
+
+    def test_eps_persistence_uses_yoy_rates_not_absolute_deltas(self):
+        rates = yoy_series([100, 110, 121, 133.1, 146.41])
+        self.assertEqual(len(rates), 4)
+        for rate in rates:
+            self.assertAlmostEqual(rate, 0.1)
+
+    def test_eps_yoy_returns_missing_when_prior_eps_nonpositive(self):
+        self.assertIsNone(yoy_series([-1, 10, 12, 14, 16]))
 
     def test_only_explicitly_approved_rows_are_used(self):
         path = self.write_queue([
