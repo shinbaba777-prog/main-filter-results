@@ -21,6 +21,16 @@ SUMMARY = OUT / "financial_metric_audit_summary.json"
 def metric_is_eps(row):
     return row.get("candidate_metric", "") == "eps"
 
+
+def is_current_year_context(context):
+    """Accept annual current-year contexts with taxonomy member suffixes.
+
+    This only removes a false context warning; it does not approve the metric.
+    """
+    return context in ("CurrentYearDuration", "CurrentYearInstant") or context.startswith(
+        ("CurrentYearDuration_", "CurrentYearInstant_")
+    )
+
 def main():
     if not SOURCE.exists():
         raise SystemExit(f"Missing input: {SOURCE}")
@@ -40,8 +50,9 @@ def main():
             unit_label = raw.get("単位", "")
             relative_year = raw.get("相対年度", "")
             flags = []
-            # Only labels explicitly indicating current-year duration/instant are considered current.
-            if context not in ("CurrentYearDuration", "CurrentYearInstant"):
+            # Accept current-year contexts with taxonomy member suffixes, but keep
+            # consolidation-scope checks separate and require manual review.
+            if not is_current_year_context(context):
                 flags.append("NOT_CURRENT_YEAR_CONTEXT")
             if not concept or ":" not in concept:
                 flags.append("CONCEPT_ID_UNVERIFIED")
