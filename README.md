@@ -89,4 +89,4 @@ EDINET APIによる提出書類取得、XBRL CSV抽出、候補検証、レビ�
 
 重要：EDINET抽出候補は未検証のまま採点に使用しません。候補件数を欠損指標数と同一視せず、一次資料と照合できた値のみ採点に使用します。正式採点完了後に index.csv へ記録し、Pagesデプロイ成功まで確認します。
 
-現在のGitHub ActionsはEDINETデータ取得・抽出とGitHub Pages公開を支援しますが、ChatGPTの正式採点結果を自動で取り込む連携や、2.3.1全配点を自動計算する採点エンジンはまだ別途実装が必要です。
+現時点で実装済み：採点入力の検証、2.3.1の配点グループ集計・欠損調整・STAGE 1判定・BUY強制ブロック、ユニットテスト、`analysis.json` から `index.csv` への重複防止付き記録、GitHub Pages自動公開です。\n\n未完了：決算短信・有報・株価・JPX業種PER・空売り・IR反応などを自動取得し、各採点細目の点数まで一次資料に基づき自動算出するデータ取得／指標計算層、およびChatGPTの分析完了時に入力JSONを自動生成してGitHubへ渡す連携です。採点入力JSONの雛形は [`examples/analysis_payload.template.json`](examples/analysis_payload.template.json)、記録コマンドは [`scripts/record_analysis.py`](scripts/record_analysis.py) です。現状は、検証済みの点数入力がなければエンジンが独自に財務数値や点数を推測することはありません。
