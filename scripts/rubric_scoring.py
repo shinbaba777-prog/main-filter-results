@@ -225,3 +225,59 @@ def ir_reaction_score(m: dict) -> list[dict]:
         p=5 if total>=4 else 4 if total>=2 else 3 if total>=0 else 2 if total>=-2 else 1 if total>=-4 else 0
         s="scored";e=f"eligible={eligible}; returns={m.get('eligible_excess_returns')!r}; adjustment_sum={total}"
     return [{"key":"ir_reaction","group":"ir_reaction","points":p,"max_points":5,"status":s,"evidence":e,"source":m.get("source","")}]
+
+
+def roic_capital_score(m: dict) -> list[dict]:
+    """5-3 ROIC/capital efficiency (15). Rates are decimals."""
+    out=[]
+    roic=m.get("roic")
+    proxy=m.get("roe") if m.get("roic_uncomputable") else None
+    used=roic if roic is not None else proxy
+    p,s=band(used,[(.20,5),(.15,4),(.10,3),(.07,2),(0,1)])
+    out.append({"key":"roic_level","group":"roic_capital","points":p,"max_points":5,"status":s,"evidence":f"ROIC={roic!r}; ROE proxy={proxy!r}","source":m.get("roic_source","")})
+    inc=m.get("incremental_roic")
+    if inc is None and m.get("incremental_roic_uncomputable"):
+        if m.get("nopat_change") is None: p=None;s="missing"
+        else: p=4 if m["nopat_change"]>0 else 0;s="scored"
+    elif inc is None: p=None;s="missing"
+    else:
+        p=4 if inc>=.20 else 3 if inc>=.10 else 2 if inc>=.05 else 1 if inc>=0 else 0;s="scored"
+    out.append({"key":"incremental_roic","group":"roic_capital","points":p,"max_points":4,"status":s,"evidence":f"incremental_roic={inc!r}; NOPAT change={m.get('nopat_change')!r}","source":m.get("incremental_roic_source","")})
+    deltas=m.get("roic_deltas")
+    if deltas is None or len(deltas)<3: p=None;s="missing";e="直近3回の前期差不足"
+    else:
+        improve=sum(x is not None and x>=.005 for x in deltas[:3]); decline=sum(x is not None and x<=-.005 for x in deltas[:3])
+        p=2 if improve>=2 else 0 if decline>=2 else 1;s="scored";e=f"deltas={deltas[:3]!r}"
+    out.append({"key":"roic_direction","group":"roic_capital","points":p,"max_points":2,"status":s,"evidence":e,"source":m.get("roic_deltas_source","")})
+    reinvest=m.get("reinvestment_rate"); h=m.get("capital_cost_h")
+    if reinvest is None or h is None or used is None: p=None;s="missing"
+    elif used>h and reinvest>=.30: p=2;s="scored"
+    elif used>h and reinvest>=.10: p=1;s="scored"
+    else: p=0;s="scored"
+    out.append({"key":"reinvestment_rate","group":"roic_capital","points":p,"max_points":2,"status":s,"evidence":f"rate={reinvest!r}; capital_cost={h!r}; ROIC/ROE={used!r}","source":m.get("reinvestment_rate_source","")})
+    roe=m.get("roe")
+    p,s=band(roe,[(.15,2),(.08,1)])
+    out.append({"key":"roe","group":"roic_capital","points":p,"max_points":2,"status":s,"evidence":f"roe={roe!r}","source":m.get("roe_source","")})
+    return out
+
+def build_items(metrics: dict) -> list[dict]:
+    """Convert source-verified metric groups into scoring-engine items.
+    Missing groups are explicitly marked missing; never filled with guessed values.
+    """
+    funcs=[
+        ("growth",growth_score),("profitability",profitability_score),
+        ("roic_capital",roic_capital_score),("finance_cf",finance_cf_score),
+        ("eps_growth",eps_score),("valuation",valuation_score),
+        ("competitive_advantage",competitive_advantage_score),
+        ("subsidiaries_ma",subsidiaries_ma_score),
+        ("shorts_supply",shorts_supply_score),("ir_reaction",ir_reaction_score)
+    ]
+    items=[]
+    for group,fn in funcs:
+        data=metrics.get(group)
+        if data is None:
+            maximum={"growth":15,"profitability":15,"roic_capital":15,"finance_cf":10,"eps_growth":10,"valuation":15,"competitive_advantage":5,"subsidiaries_ma":3,"shorts_supply":7,"ir_reaction":5}[group]
+            items.append({"key":group,"group":group,"points":None,"max_points":maximum,"status":"missing","evidence":"このグループの指標データが未提供","source":""})
+        else:
+            items.extend(fn(data))
+    return items
