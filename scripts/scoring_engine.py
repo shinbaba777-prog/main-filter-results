@@ -83,7 +83,7 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
     stage1_denominator = 80 - stage1_missing - stage1_na
     stage1_rate = (stage1_earned / stage1_denominator * 100) if stage1_denominator > 0 else None
     stage1_insufficient = stage1_missing > 16
-    stage1_pass = (not stage1_insufficient and stage1_rate is not None and stage1_rate >= 65)
+    stage1_pass = (not stage1_insufficient and stage1_rate is not None and stage1_rate >= 65 and stage1_earned >= 52)
 
     earned = sum(v["earned"] for v in actual.values())
     missing = sum(v["missing"] for v in actual.values())
