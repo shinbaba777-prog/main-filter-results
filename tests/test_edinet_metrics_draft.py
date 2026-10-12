@@ -1,8 +1,11 @@
 import csv
+import json
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
-from scripts.build_edinet_metrics_draft import load_approved, yoy_series
+from scripts.build_edinet_metrics_draft import load_approved, yoy_series, main
 
 
 class EdinetMetricsDraftTests(unittest.TestCase):
@@ -66,6 +69,23 @@ class EdinetMetricsDraftTests(unittest.TestCase):
         path = self.write_queue([self.row(review_status="MANUAL_REVIEW_REQUIRED")])
         self.assertEqual(load_approved(path, "1234"), {})
 
+
+    def test_unverified_risk_flags_are_unknown_in_generated_draft(self):
+        queue = self.write_queue([])
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "draft.json"
+            argv = ["build_edinet_metrics_draft.py", "--code", "1234", "--company", "テスト株式会社", "--queue", str(queue), "--out", str(output)]
+            with patch.object(sys, "argv", argv):
+                self.assertEqual(main(), None)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+        self.assertIsNone(payload["metrics"]["finance_cf"]["ocf_negative_two_consecutive"])
+        self.assertIsNone(payload["metrics"]["finance_cf"]["net_cash"])
+        self.assertIsNone(payload["metrics"]["finance_cf"]["share_count_increased_three_years"])
+        self.assertIsNone(payload["metrics"]["valuation"]["ebitda_nonpositive"])
+        self.assertIsNone(payload["metrics"]["subsidiaries_ma"]["no_material_subsidiaries_and_no_ma_5y"])
+        self.assertIsNone(payload["metrics"]["subsidiaries_ma"]["material_impairment"])
+        self.assertIsNone(payload["metrics"]["shorts_supply"]["no_public_short_positions_90d"])
+        self.assertTrue(all(value is None for value in payload["buy_block_inputs"].values()))
 
 if __name__ == "__main__":
     unittest.main()
