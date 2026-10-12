@@ -1,0 +1,113 @@
+{
+  "code": "0000",
+  "company": "会社名",
+  "analysis_date": "YYYY-MM-DD",
+  "earnings_date": "",
+  "earnings_text": "",
+  "holding": false,
+  "notes": "",
+  "items": [
+    {
+      "key": "growth",
+      "group": "growth",
+      "points": null,
+      "max_points": 15,
+      "status": "missing",
+      "evidence": "未取得項目名・理由",
+      "source": "取得を試みた資料名とURL"
+    },
+    {
+      "key": "profitability",
+      "group": "profitability",
+      "points": null,
+      "max_points": 15,
+      "status": "missing",
+      "evidence": "未取得項目名・理由",
+      "source": "取得を試みた資料名とURL"
+    },
+    {
+      "key": "roic_capital",
+      "group": "roic_capital",
+      "points": null,
+      "max_points": 15,
+      "status": "missing",
+      "evidence": "未取得項目名・理由",
+      "source": "取得を試みた資料名とURL"
+    },
+    {
+      "key": "finance_cf",
+      "group": "finance_cf",
+      "points": null,
+      "max_points": 10,
+      "status": "missing",
+      "evidence": "未取得項目名・理由",
+      "source": "取得を試みた資料名とURL"
+    },
+    {
+      "key": "eps_growth",
+      "group": "eps_growth",
+      "points": null,
+      "max_points": 10,
+      "status": "missing",
+      "evidence": "未取得項目名・理由",
+      "source": "取得を試みた資料名とURL"
+    },
+    {
+      "key": "valuation",
+      "group": "valuation",
+      "points": null,
+      "max_points": 15,
+      "status": "missing",
+      "evidence": "未取得項目名・理由",
+      "source": "取得を試みた資料名とURL"
+    },
+    {
+      "key": "competitive_advantage",
+      "group": "competitive_advantage",
+      "points": null,
+      "max_points": 5,
+      "status": "missing",
+      "evidence": "未取得項目名・理由",
+      "source": "取得を試みた資料名とURL"
+    },
+    {
+      "key": "subsidiaries_ma",
+      "group": "subsidiaries_ma",
+      "points": null,
+      "max_points": 3,
+      "status": "missing",
+      "evidence": "未取得項目名・理由",
+      "source": "取得を試みた資料名とURL"
+    },
+    {
+      "key": "shorts_supply",
+      "group": "shorts_supply",
+      "points": null,
+      "max_points": 7,
+      "status": "missing",
+      "evidence": "未取得項目名・理由",
+      "source": "取得を試みた資料名とURL"
+    },
+    {
+      "key": "ir_reaction",
+      "group": "ir_reaction",
+      "points": null,
+      "max_points": 5,
+      "status": "missing",
+      "evidence": "未取得項目名・理由",
+      "source": "取得を試みた資料名とURL"
+    }
+  ],
+  "buy_block_inputs": {
+    "shorts_direction_zero": false,
+    "shorts_applicable": false,
+    "ocf_ni_zero": false,
+    "dilution_zero": false,
+    "roic_below_h": false,
+    "roic_unavailable": true,
+    "short_type_a": false,
+    "peg_over_2": false,
+    "industry_per_over_130": false,
+    "base_upside_pct": null
+  }
+}
