@@ -282,3 +282,24 @@ def build_items(metrics: dict) -> list[dict]:
         else:
             items.extend(fn(data))
     return items
+
+
+# Override with strict evidence handling: absence of a count is missing, not zero IRs.
+def ir_reaction_score(m: dict) -> list[dict]:
+    target=m.get("target_ir_count_12m")
+    eligible=m.get("eligible_ir_count_12m")
+    if target is None:
+        p=None;s="missing";e="対象IR件数が未確認"
+    elif target==0:
+        p=None;s="not_applicable";e="対象IRが直近12ヶ月ゼロ"
+    elif eligible is None:
+        p=None;s="missing";e="採点可能IR件数が未確認"
+    elif eligible==0:
+        p=None;s="missing";e="対象IRあり、成熟・非重複の採点可能IRなし"
+    else:
+        total=0
+        for ret in m.get("eligible_excess_returns",[]):
+            total += 2 if ret>=.10 else 1 if ret>=.03 else 0 if ret>-.03 else -1 if ret>-.10 else -2
+        p=5 if total>=4 else 4 if total>=2 else 3 if total>=0 else 2 if total>=-2 else 1 if total>=-4 else 0
+        s="scored";e=f"eligible={eligible}; returns={m.get('eligible_excess_returns')!r}; adjustment_sum={total}"
+    return [{"key":"ir_reaction","group":"ir_reaction","points":p,"max_points":5,"status":s,"evidence":e,"source":m.get("source","")}]
