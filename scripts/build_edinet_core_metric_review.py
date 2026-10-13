@@ -6,7 +6,7 @@ This creates a human-review aid only. It never marks values as approved for scor
 from __future__ import annotations
 import csv, json
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,6 +14,7 @@ OUT = ROOT / "data" / "edinet" / "extracted"
 SOURCE = OUT / "financial_metric_candidates.csv"
 QUEUE = OUT / "core_metric_review_queue.csv"
 SUMMARY = OUT / "core_metric_review_queue_summary.json"
+MANIFEST = ROOT / "data" / "edinet" / "extraction_summary.json"
 
 # Narrow allowlist: concepts whose meaning is sufficiently explicit for triage.
 # These still require filing-period, taxonomy, and duplicate checks by a human.
@@ -41,6 +42,7 @@ CONTEXTS = {
 }
 FIELDS = [
     "security_code", "candidate_metric", "value", "relative_year",
+    "filing_period_end", "fiscal_year_inferred", "context_year_offset",
     "source_zip", "source_csv", "row_number", "element_id", "context_id",
     "period_type", "consolidation_scope", "unit_id", "unit_label",
     "review_status", "review_reason", "duplicate_count", "source_row_numbers", "raw_row_json",
@@ -63,6 +65,17 @@ def main():
     if not SOURCE.exists():
         raise SystemExit(f"Missing input: {SOURCE}")
     rows, counts = [], Counter()
+    filing_periods = {}
+    if MANIFEST.exists():
+        try:
+            manifest_data = json.loads(MANIFEST.read_text(encoding="utf-8"))
+            filing_periods = {
+                item.get("file", ""): item.get("periodEnd", "")
+                for item in manifest_data.get("fiscal_periods", manifest_data.get("periods", []))
+                if item.get("file") and item.get("periodEnd")
+            }
+        except (OSError, json.JSONDecodeError):
+            filing_periods = {}
     with SOURCE.open("r", encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
             try:
@@ -108,20 +121,35 @@ def main():
             if not unit_ok:
                 reasons.append("UNIT_MISSING")
             if context.startswith("CurrentYear"):
-                year = "当期"
+                year, offset = "当期", 0
             elif context.startswith("Prior1Year"):
-                year = "前期"
+                year, offset = "前期", 1
             elif context.startswith("Prior2Year"):
-                year = "前々期"
+                year, offset = "前々期", 2
             elif context.startswith("Prior3Year"):
-                year = "3期前"
+                year, offset = "3期前", 3
             else:
-                year = "4期前"
+                year, offset = "4期前", 4
+
+            source_zip = row.get("source_zip", "")
+            filing_period_end = filing_periods.get(source_zip, "")
+            fiscal_year_inferred = ""
+            if filing_period_end:
+                try:
+                    # The XBRL context provides a relative annual offset, but this
+                    # source CSV may not expose the exact historical end date.
+                    # Preserve the inferred year separately; never call it verified.
+                    fiscal_year_inferred = str(date.fromisoformat(filing_period_end).year - offset)
+                except ValueError:
+                    counts["invalid_filing_period_end"] += 1
             rec = {
                 "security_code": row.get("security_code", ""),
                 "candidate_metric": metric,
                 "value": row.get("value", ""),
                 "relative_year": year,
+                "filing_period_end": filing_period_end,
+                "fiscal_year_inferred": fiscal_year_inferred,
+                "context_year_offset": offset,
                 "source_zip": row.get("source_zip", ""),
                 "source_csv": row.get("source_csv", ""),
                 "row_number": row.get("row_number", ""),
@@ -172,7 +200,7 @@ def main():
         "rows_before_deduplication": len(rows) + duplicate_rows_collapsed,
         "duplicate_rows_collapsed": duplicate_rows_collapsed,
         "counts": dict(counts),
-        "important_warning": "Review queue only. No row is approved for investment scoring. Confirm official filing, fiscal period dates, taxonomy definition, unit/scale, signs, and duplicates before use."
+        "important_warning": "Review queue only. No row is approved for investment scoring. fiscal_year_inferred is inferred from filing period end and relative context offset, not a verified period end; confirm exact XBRL dates, filing, taxonomy definition, unit/scale, signs, and duplicates before use."
     }
     SUMMARY.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False))
