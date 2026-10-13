@@ -61,6 +61,18 @@ def is_annual_context(context: str) -> bool:
     return False
 
 
+def infer_fiscal_year(filing_period_end: str, offset: int) -> str:
+    """Infer a calendar year from filing year and relative context offset.
+
+    This is a triage hint only: fiscal year-end dates must be verified against
+    the actual XBRL context and filing before any investment use.
+    """
+    try:
+        return str(date.fromisoformat(filing_period_end).year - offset)
+    except (TypeError, ValueError):
+        return ""
+
+
 def main():
     if not SOURCE.exists():
         raise SystemExit(f"Missing input: {SOURCE}")
@@ -135,12 +147,8 @@ def main():
             filing_period_end = filing_periods.get(source_zip, "")
             fiscal_year_inferred = ""
             if filing_period_end:
-                try:
-                    # The XBRL context provides a relative annual offset, but this
-                    # source CSV may not expose the exact historical end date.
-                    # Preserve the inferred year separately; never call it verified.
-                    fiscal_year_inferred = str(date.fromisoformat(filing_period_end).year - offset)
-                except ValueError:
+                fiscal_year_inferred = infer_fiscal_year(filing_period_end, offset)
+                if not fiscal_year_inferred:
                     counts["invalid_filing_period_end"] += 1
             rec = {
                 "security_code": row.get("security_code", ""),
