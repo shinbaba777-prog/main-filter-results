@@ -1,20 +1,21 @@
 {
-  "generated_at_utc": "2026-10-12T20:24:15.085749+00:00",
+  "generated_at_utc": "2026-10-14T10:31:19.328675+00:00",
   "input": "data/edinet/extracted/financial_metric_candidates.csv",
   "output": "data/edinet/extracted/core_metric_review_queue.csv",
-  "rows_queued": 144,
-  "rows_before_deduplication": 144,
-  "duplicate_rows_collapsed": 0,
+  "rows_queued": 310,
+  "rows_before_deduplication": 320,
+  "duplicate_rows_collapsed": 10,
   "counts": {
-    "queued_sales": 25,
-    "queued_ordinary_profit": 25,
-    "queued_profit": 25,
-    "excluded_concept_or_metric": 141,
-    "queued_eps": 25,
-    "queued_ocf": 22,
-    "queued_icf": 22,
-    "excluded_nonconsolidated_or_unclear_scope": 84,
-    "duplicate_rows_collapsed": 0
+    "queued_sales": 60,
+    "queued_ordinary_profit": 60,
+    "queued_profit": 70,
+    "excluded_concept_or_metric": 280,
+    "queued_eps": 50,
+    "queued_ocf": 35,
+    "queued_icf": 35,
+    "queued_operating_profit": 10,
+    "excluded_nonconsolidated_or_unclear_scope": 80,
+    "duplicate_rows_collapsed": 10
   },
-  "important_warning": "Review queue only. No row is approved for investment scoring. Confirm official filing, fiscal period dates, taxonomy definition, unit/scale, signs, and duplicates before use."
+  "important_warning": "Review queue only. No row is approved for investment scoring. fiscal_year_inferred is inferred from filing period end and relative context offset, not a verified period end; confirm exact XBRL dates, filing, taxonomy definition, unit/scale, signs, and duplicates before use."
 }

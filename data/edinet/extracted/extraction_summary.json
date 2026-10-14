@@ -1,50 +1,50 @@
 {
-  "generated_at_utc": "2026-10-12T20:24:15.001183+00:00",
+  "generated_at_utc": "2026-10-14T10:31:19.190488+00:00",
   "source_zips": [
-    "44140_S100ODYT_xbrl_csv.zip",
-    "44140_S100R2I8_xbrl_csv.zip",
-    "44140_S100TPF0_xbrl_csv.zip",
-    "44140_S100W10D_xbrl_csv.zip",
-    "44140_S100YG80_xbrl_csv.zip"
+    "44060_S100OK43_xbrl_csv.zip",
+    "44060_S100R83V_xbrl_csv.zip",
+    "44060_S100TUAP_xbrl_csv.zip",
+    "44060_S100W17N_xbrl_csv.zip",
+    "44060_S100YGXD_xbrl_csv.zip"
   ],
-  "numeric_rows": 2304,
-  "candidate_metric_rows": 369,
+  "numeric_rows": 5193,
+  "candidate_metric_rows": 680,
   "skipped_csv_members": [],
   "fiscal_periods": [
     {
       "periodEnd": "2022-03-31",
-      "docID": "S100ODYT",
+      "docID": "S100OK43",
       "status": "downloaded",
       "reason": "",
-      "file": "44140_S100ODYT_xbrl_csv.zip"
+      "file": "44060_S100OK43_xbrl_csv.zip"
     },
     {
       "periodEnd": "2023-03-31",
-      "docID": "S100R2I8",
+      "docID": "S100R83V",
       "status": "downloaded",
       "reason": "",
-      "file": "44140_S100R2I8_xbrl_csv.zip"
+      "file": "44060_S100R83V_xbrl_csv.zip"
     },
     {
       "periodEnd": "2024-03-31",
-      "docID": "S100TPF0",
+      "docID": "S100TUAP",
       "status": "downloaded",
       "reason": "",
-      "file": "44140_S100TPF0_xbrl_csv.zip"
+      "file": "44060_S100TUAP_xbrl_csv.zip"
     },
     {
       "periodEnd": "2025-03-31",
-      "docID": "S100W10D",
+      "docID": "S100W17N",
       "status": "downloaded",
       "reason": "",
-      "file": "44140_S100W10D_xbrl_csv.zip"
+      "file": "44060_S100W17N_xbrl_csv.zip"
     },
     {
       "periodEnd": "2026-03-31",
-      "docID": "S100YG80",
+      "docID": "S100YGXD",
       "status": "downloaded",
       "reason": "",
-      "file": "44140_S100YG80_xbrl_csv.zip"
+      "file": "44060_S100YGXD_xbrl_csv.zip"
     }
   ],
   "amendments": [],
