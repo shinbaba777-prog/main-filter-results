@@ -14,7 +14,7 @@ OUT = ROOT / "data" / "edinet" / "extracted"
 SOURCE = OUT / "financial_metric_candidates.csv"
 QUEUE = OUT / "core_metric_review_queue.csv"
 SUMMARY = OUT / "core_metric_review_queue_summary.json"
-MANIFEST = ROOT / "data" / "edinet" / "extraction_summary.json"
+MANIFEST = OUT / "extraction_summary.json"
 
 # Narrow allowlist: concepts whose meaning is sufficiently explicit for triage.
 # These still require filing-period, taxonomy, and duplicate checks by a human.
