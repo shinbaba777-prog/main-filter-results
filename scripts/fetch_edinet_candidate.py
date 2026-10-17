@@ -326,6 +326,9 @@ def main() -> int:
                     try:
                         _, listing = future.result()
                         found.extend(filter_history_rows(listing, accepted_codes))
+                    except EdinetAuthError:
+                        # Invalid/expired credentials are fatal; do not hammer every remaining date.
+                        raise
                     except (requests.RequestException, ValueError, RuntimeError) as exc:
                         failed.append(scan_day)
                         print(f"Warning: {label} listing request failed for {scan_day}: {type(exc).__name__}")
@@ -395,11 +398,12 @@ def main() -> int:
             failed_days.extend(failed)
             missing_periods = periods_missing_from_scan()
 
-        if missing_periods or failed_days or not latest_period:
-            print("WARNING: targeted history did not fully reconcile; falling back to full historical scan.", flush=True)
-            found, failed = scan_dates(full_scan_days, "Full historical fallback")
-            historical_matches.extend(found)
-            failed_days.extend(failed)
+        # Always audit the full requested historical range for amendments, even
+        # when all original annual reports were found by targeted searches.
+        # Older successful daily listings are cached, while recent dates refresh.
+        found, failed = scan_dates(full_scan_days, "Full historical amendment audit")
+        historical_matches.extend(found)
+        failed_days.extend(failed)
             # Retry failed dates once after a cooldown.
             if failed_days:
                 time.sleep(60)
@@ -481,7 +485,7 @@ def main() -> int:
         if not matches:
             OUT.mkdir(parents=True, exist_ok=True)
             manifest = {"requested_code": code, "requested_periods": 1, "status": "incomplete", "periods": [], "gaps": [], "failed_scan_dates": [], "amendments": [], "reason": "no_matching_filing_in_recent_window"}
-            (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(OUT / "download_manifest.json", manifest)
             print(f"No downloadable annual-report CSV found for securities code {code} in the last {args.days} days.")
             return 3
         matches.sort(key=lambda r: r.get("submitDateTime", ""), reverse=True)
@@ -493,7 +497,7 @@ def main() -> int:
                         "periods": [{"periodEnd": matches[0].get("periodEnd") or "", "docID": matches[0].get("docID"),
                                      "status": "missing", "reason": type(exc).__name__}],
                         "gaps": [], "failed_scan_dates": [], "amendments": []}
-            (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(OUT / "download_manifest.json", manifest)
             print(f"ERROR: latest CSV download failed ({type(exc).__name__}); API key and URL redacted.", file=sys.stderr)
             return 3
         amendments = [r for r in rows if str(r.get("docTypeCode", "")) == "130" and normalize_code(r.get("secCode")) in accepted_codes and str(r.get("csvFlag", "")) == "1" and str(r.get("legalStatus", "1")) in {"1", "2"} and str(r.get("withdrawalStatus", "0")) not in {"1", "2"} and str(r.get("docInfoEditStatus", "1")) != "2"]
