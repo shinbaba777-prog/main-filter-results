@@ -485,6 +485,22 @@ def main() -> int:
                         retry_failed.append(failed_day)
                 failed_days = retry_failed
 
+        # A targeted scan can locate five filings without proving that the
+        # full date range was read. Complete the full calendar-day audit before
+        # any manifest can be marked complete.
+        if len(scanned_days) < len(full_scan_days):
+            found, failed = scan_dates(full_scan_days, "Full calendar-day verification")
+            historical_matches.extend(found)
+            failed_days.extend(failed)
+        if failed_days:
+            time.sleep(60)
+            retry_failed = []
+            for failed_day in sorted(set(failed_days)):
+                try:
+                    historical_matches.extend(filter_history_rows(fetch_listing_cached(failed_day, api_key, listing_cache), accepted_codes))
+                except (requests.RequestException, ValueError, RuntimeError):
+                    retry_failed.append(failed_day)
+            failed_days = retry_failed
         listing_cache.save()
         scan_days = sorted(scanned_days)
         print(f"Historical scan: {len(scan_days)} unique weekday queries; {len(failed_days)} failed after retry.");
@@ -511,6 +527,7 @@ def main() -> int:
             return 3
         print(f"Historical scan: {len(scan_days)} weekdays queried; {len(historical_matches)} matching records; {len(selected)} fiscal periods selected.", flush=True)
         manifest = {"requested_code": code, "requested_periods": args.history_years, "status": "incomplete", "periods": [], "gaps": [], "failed_scan_dates": [d.isoformat() for d in failed_days], "scan_range": {"start": full_start_day.isoformat(), "end": end_day.isoformat(), "calendar_days_expected": len(calendar_dates(full_start_day, end_day)), "calendar_days_scanned": len(scan_days)}, "missing_expected_periods": [], "amendments": []}
+        manifest["missing_expected_periods"] = [p.isoformat() for p in missing_periods]
         selected_doc_ids = {str(row.get("docID")) for row in selected}
         selected_period_ends = {str(row.get("periodEnd") or "") for row in selected}
         issuer_rows = [row for row in historical_matches + matches if normalize_code(row.get("secCode")) in accepted_codes and str(row.get("legalStatus", "1")) in {"1", "2"} and str(row.get("withdrawalStatus", "0")) not in {"1", "2"} and str(row.get("docInfoEditStatus", "1")) != "2"]
