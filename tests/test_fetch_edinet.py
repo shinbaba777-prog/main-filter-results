@@ -55,6 +55,39 @@ class FetchEdinetTests(unittest.TestCase):
         self.assertEqual({r["docID"] for r in filtered}, {"AMEND123", "TEXT123"})
 
 
+
+    def test_calendar_dates_includes_weekends(self):
+        self.assertEqual(
+            fetch_edinet.calendar_dates(date(2026, 10, 9), date(2026, 10, 12)),
+            [date(2026, 10, 9), date(2026, 10, 10), date(2026, 10, 11), date(2026, 10, 12)],
+        )
+
+    def test_listing_cache_reuses_old_successful_date_and_refreshes_recent_dates(self):
+        import tempfile
+        from pathlib import Path
+
+        today = date(2026, 10, 17)
+        old_day = date(2026, 1, 1)
+        recent_day = date(2026, 10, 10)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache = fetch_edinet.ListingCache(Path(temp_dir), today)
+            cache.put(old_day, [{"docID": "DOC12345", "secCode": "44060"}])
+            cache.save()
+            reloaded = fetch_edinet.ListingCache(Path(temp_dir), today)
+            self.assertEqual(reloaded.get(old_day), [{"docID": "DOC12345", "secCode": "44060"}])
+            self.assertIsNone(reloaded.get(recent_day))
+
+    def test_listing_cache_ignores_corrupt_cache_file(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_dir = Path(temp_dir)
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            (cache_dir / "2025.json.gz").write_bytes(b"not-gzip")
+            cache = fetch_edinet.ListingCache(cache_dir, date(2026, 10, 17))
+            self.assertIsNone(cache.get(date(2025, 1, 1)))
+
     def test_existing_valid_zip_is_reused_without_api_call(self):
         import tempfile
         import zipfile
