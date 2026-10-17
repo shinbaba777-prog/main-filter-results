@@ -47,10 +47,31 @@ class FetchEdinetTests(unittest.TestCase):
             {"docTypeCode": "120", "secCode": "44060", "csvFlag": "1"},
             {"docTypeCode": "120", "secCode": "99990", "csvFlag": "1"},
             {"docTypeCode": "120", "secCode": "44060", "csvFlag": "0"},
-            {"docTypeCode": "130", "secCode": "44060", "csvFlag": "1"},
+            {"docTypeCode": "130", "secCode": "44060", "csvFlag": "1", "docID": "AMEND123"},
+            {"docTypeCode": "130", "secCode": "44060", "csvFlag": "0", "docID": "TEXT123"},
         ]
         filtered = fetch_edinet.filter_history_rows(rows, {"4406", "44060"})
-        self.assertEqual(len(filtered), 2)
+        self.assertEqual(len(filtered), 3)
+        self.assertEqual({r["docID"] for r in filtered}, {"AMEND123", "TEXT123"})
+
+
+    def test_existing_valid_zip_is_reused_without_api_call(self):
+        import tempfile
+        import zipfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            old_out = fetch_edinet.OUT
+            fetch_edinet.OUT = Path(temp_dir)
+            try:
+                path = fetch_edinet.OUT / "44060_DOC12345_xbrl_csv.zip"
+                with zipfile.ZipFile(path, "w") as zf:
+                    zf.writestr("data.csv", "a,b\\n1,2\\n")
+                with patch.object(fetch_edinet, "api_get", side_effect=AssertionError("network must not be called")):
+                    reused = fetch_edinet.download_csv_zip({"docID": "DOC12345", "secCode": "44060"}, "fake-key")
+                self.assertEqual(reused, path)
+            finally:
+                fetch_edinet.OUT = old_out
 
     def test_listing_without_metadata_is_not_an_empty_day(self):
         with patch.object(fetch_edinet, "api_get", return_value=FakeResponse(payload={"StatusCode": 429, "message": "Too Many Requests"})):
