@@ -502,6 +502,9 @@ def main() -> int:
                     retry_failed.append(failed_day)
             failed_days = retry_failed
         listing_cache.save()
+        # Reconcile expected fiscal periods against the complete scan, not only
+        # the targeted passes, so manifest gaps reflect all retrieved listings.
+        missing_periods = periods_missing_from_scan()
         scan_days = sorted(scanned_days)
         print(f"Historical scan: {len(scan_days)} unique weekday queries; {len(failed_days)} failed after retry.");
         by_period = {}
@@ -575,8 +578,14 @@ def main() -> int:
         # A successful scan is not sufficient if the requested number of fiscal
         # periods is missing. Never label an unexplained short history as complete.
         expected_calendar_days = len(calendar_dates(full_start_day, end_day))
-        if failed_days or downloaded < len(selected) or manifest["gaps"] or len(selected) < args.history_years or len(scan_days) != expected_calendar_days:
+        full_scan_verified = not failed_days and len(scan_days) == expected_calendar_days
+        all_selected_downloaded = downloaded == len(selected)
+        if not full_scan_verified or not all_selected_downloaded or manifest["gaps"]:
             manifest["status"] = "incomplete"
+        elif len(selected) < args.history_years:
+            # A shorter history can be valid for a newly listed issuer, but only
+            # after every calendar day was audited and any missing periods recorded.
+            manifest["status"] = "complete_short_history"
         elif manifest["amendments"]:
             manifest["status"] = "complete_with_amendments"
         else:
@@ -592,7 +601,7 @@ def main() -> int:
         if not matches:
             OUT.mkdir(parents=True, exist_ok=True)
             manifest = {"requested_code": code, "requested_periods": 1, "status": "incomplete", "periods": [], "gaps": [], "failed_scan_dates": [], "amendments": [], "reason": "no_matching_filing_in_recent_window"}
-            (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(OUT / "download_manifest.json", manifest)
             print(f"No downloadable annual-report CSV found for securities code {code} in the last {args.days} days.")
             return 3
         matches.sort(key=lambda r: r.get("submitDateTime", ""), reverse=True)
@@ -607,11 +616,41 @@ def main() -> int:
             (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"ERROR: latest CSV download failed ({type(exc).__name__}); API key and URL redacted.", file=sys.stderr)
             return 3
-        manifest = {"requested_code": code, "requested_periods": 1, "status": "complete",
-                    "periods": [{"periodEnd": matches[0].get("periodEnd") or "", "docID": matches[0].get("docID"),
+        selected_row = matches[0]
+        selected_doc_id = str(selected_row.get("docID") or "")
+        selected_period_end = str(selected_row.get("periodEnd") or "")
+        amendments = []
+        seen_amendments = set()
+        for row in rows:
+            if str(row.get("docTypeCode", "")) != "130":
+                continue
+            if normalize_code(row.get("secCode")) not in accepted_codes:
+                continue
+            if str(row.get("legalStatus", "1")) not in {"1", "2"}:
+                continue
+            if str(row.get("withdrawalStatus", "0")) in {"1", "2"}:
+                continue
+            if str(row.get("docInfoEditStatus", "1")) == "2":
+                continue
+            parent_id = str(row.get("parentDocID") or "")
+            period_end = str(row.get("periodEnd") or "")
+            if parent_id and parent_id != selected_doc_id:
+                continue
+            if not parent_id and period_end != selected_period_end:
+                continue
+            if period_end and period_end != selected_period_end:
+                continue
+            doc_id = str(row.get("docID") or "")
+            if not doc_id or doc_id in seen_amendments:
+                continue
+            seen_amendments.add(doc_id)
+            amendments.append({"docID": doc_id, "parentDocID": parent_id, "periodEnd": period_end, "status": "needs_review"})
+        manifest = {"requested_code": code, "requested_periods": 1,
+                    "status": "complete_with_amendments" if amendments else "complete",
+                    "periods": [{"periodEnd": selected_period_end, "docID": selected_doc_id,
                                  "status": "downloaded", "file": path.name}],
-                    "gaps": [], "failed_scan_dates": [], "amendments": []}
-        (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+                    "gaps": [], "failed_scan_dates": [], "amendments": amendments}
+        write_json_atomic(OUT / "download_manifest.json", manifest)
         print(f"Downloaded latest matching XBRL CSV ZIP: {path}")
 
     write_metadata(rows)
