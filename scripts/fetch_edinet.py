@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import io
 import json
 import os
@@ -143,6 +144,90 @@ def atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None
 def write_json_atomic(path: Path, payload: object) -> None:
     atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
 
+
+CACHE_REFRESH_DAYS = 180
+CACHE_VERSION = 1
+CACHE_DIR = OUT / "listing_cache"
+
+def calendar_dates(start_day: date, end_day: date) -> list[date]:
+    """Return every calendar date in an inclusive range, including weekends."""
+    if end_day < start_day:
+        return []
+    result = []
+    day = start_day
+    while day <= end_day:
+        result.append(day)
+        day += timedelta(days=1)
+    return result
+
+class ListingCache:
+    """Validated deterministic gzip cache for successful date-scoped listings."""
+    def __init__(self, directory: Path, today: date, refresh_days: int = CACHE_REFRESH_DAYS):
+        self.directory, self.today, self.refresh_days = directory, today, refresh_days
+        self._years: dict[int, dict[str, list[dict]]] = {}
+        self._dirty: set[int] = set()
+
+    def _load_year(self, year: int) -> dict[str, list[dict]]:
+        if year in self._years:
+            return self._years[year]
+        path = self.directory / (str(year) + ".json.gz")
+        days: dict[str, list[dict]] = {}
+        if path.exists():
+            try:
+                with gzip.open(path, "rt", encoding="utf-8") as stream:
+                    payload = json.load(stream)
+                if isinstance(payload, dict) and payload.get("version") == CACHE_VERSION and isinstance(payload.get("days"), dict):
+                    for key, rows in payload["days"].items():
+                        try:
+                            parsed = date.fromisoformat(key)
+                        except (TypeError, ValueError):
+                            continue
+                        if parsed.year == year and isinstance(rows, list) and all(isinstance(row, dict) for row in rows):
+                            days[key] = rows
+            except (OSError, EOFError, gzip.BadGzipFile, json.JSONDecodeError):
+                days = {}
+        self._years[year] = days
+        return days
+
+    def get(self, day: date) -> list[dict] | None:
+        if (self.today - day).days < self.refresh_days:
+            return None
+        rows = self._load_year(day.year).get(day.isoformat())
+        return [dict(row) for row in rows] if rows is not None else None
+
+    def put(self, day: date, rows: list[dict]) -> None:
+        if (self.today - day).days < self.refresh_days:
+            return
+        if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+            raise EdinetError("listing cache: invalid row schema")
+        self._load_year(day.year)[day.isoformat()] = rows
+        self._dirty.add(day.year)
+
+    def save(self) -> None:
+        for year in sorted(self._dirty):
+            path = self.directory / (str(year) + ".json.gz")
+            payload = json.dumps({"version": CACHE_VERSION, "days": self._years[year]}, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            self.directory.mkdir(parents=True, exist_ok=True)
+            fd, temp_name = tempfile.mkstemp(prefix="." + str(year) + ".", suffix=".tmp", dir=self.directory)
+            try:
+                with os.fdopen(fd, "wb") as raw:
+                    with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as stream:
+                        stream.write(payload)
+                    raw.flush()
+                    os.fsync(raw.fileno())
+                os.replace(temp_name, path)
+            finally:
+                if os.path.exists(temp_name):
+                    os.unlink(temp_name)
+        self._dirty.clear()
+
+def fetch_listing_cached(day: date, api_key: str, cache: ListingCache) -> list[dict]:
+    cached = cache.get(day)
+    if cached is not None:
+        return cached
+    rows = fetch_listing(day, api_key)
+    cache.put(day, rows)
+    return rows
 
 def add_months(day: date, months: int) -> date:
     """Shift a date by calendar months, clamping the day to the target month."""
@@ -291,13 +376,14 @@ def main() -> int:
 
         end_day = today - timedelta(days=args.days)
         full_start_day = today - timedelta(days=365 * args.history_years + 120)
-        full_scan_days = weekday_dates(full_start_day, end_day)
+        full_scan_days = calendar_dates(full_start_day, end_day)
+        listing_cache = ListingCache(CACHE_DIR, today)
         historical_matches = []
         failed_days = []
         scanned_days = set()
 
         def fetch_historical_day(scan_day):
-            return scan_day, fetch_listing(scan_day, api_key)
+            return scan_day, fetch_listing_cached(scan_day, api_key, listing_cache)
 
         def scan_dates(days, label):
             fresh_days = [d for d in days if d not in scanned_days]
@@ -319,7 +405,7 @@ def main() -> int:
                         print(f"Warning: {label} listing request failed for {scan_day}: {type(exc).__name__}")
                     completed += 1
                     if completed % 100 == 0 or completed == len(fresh_days):
-                        print(f"{label} progress: {completed}/{len(fresh_days)} new weekday queries; {len(found)} matching filings found.", flush=True)
+                        print(f"{label} progress: {completed}/{len(fresh_days)} new calendar-day queries; {len(found)} matching filings found.", flush=True)
             return found, failed
 
         # The --days window is already queried above. Use it as the first attempt
@@ -399,6 +485,7 @@ def main() -> int:
                         retry_failed.append(failed_day)
                 failed_days = retry_failed
 
+        listing_cache.save()
         scan_days = sorted(scanned_days)
         print(f"Historical scan: {len(scan_days)} unique weekday queries; {len(failed_days)} failed after retry.");
         by_period = {}
@@ -423,10 +510,30 @@ def main() -> int:
             print(f"ERROR: no annual-report CSV filings found for securities code {code}.", file=sys.stderr)
             return 3
         print(f"Historical scan: {len(scan_days)} weekdays queried; {len(historical_matches)} matching records; {len(selected)} fiscal periods selected.", flush=True)
-        manifest = {"requested_code": code, "requested_periods": args.history_years, "status": "incomplete", "periods": [], "gaps": [], "failed_scan_dates": [d.isoformat() for d in failed_days], "amendments": []}
-        for row in historical_matches + matches:
-            if str(row.get("docTypeCode", "")) == "130":
-                manifest["amendments"].append({"docID": row.get("docID"), "parentDocID": row.get("parentDocID"), "periodEnd": row.get("periodEnd") or "", "status": "needs_review"})
+        manifest = {"requested_code": code, "requested_periods": args.history_years, "status": "incomplete", "periods": [], "gaps": [], "failed_scan_dates": [d.isoformat() for d in failed_days], "scan_range": {"start": full_start_day.isoformat(), "end": end_day.isoformat(), "calendar_days_expected": len(calendar_dates(full_start_day, end_day)), "calendar_days_scanned": len(scan_days)}, "missing_expected_periods": [], "amendments": []}
+        selected_doc_ids = {str(row.get("docID")) for row in selected}
+        selected_period_ends = {str(row.get("periodEnd") or "") for row in selected}
+        issuer_rows = [row for row in historical_matches + matches if normalize_code(row.get("secCode")) in accepted_codes and str(row.get("legalStatus", "1")) in {"1", "2"} and str(row.get("withdrawalStatus", "0")) not in {"1", "2"} and str(row.get("docInfoEditStatus", "1")) != "2"]
+        amendment_rows = []
+        for row in issuer_rows:
+            if str(row.get("docTypeCode", "")) != "130":
+                continue
+            parent_id = str(row.get("parentDocID") or "")
+            period_end = str(row.get("periodEnd") or "")
+            if parent_id and parent_id not in selected_doc_ids:
+                continue
+            if not parent_id and period_end not in selected_period_ends:
+                continue
+            if parent_id and period_end and period_end not in selected_period_ends:
+                continue
+            amendment_rows.append(row)
+        seen_amendments = set()
+        for row in amendment_rows:
+            doc_id = str(row.get("docID") or "")
+            if not doc_id or doc_id in seen_amendments:
+                continue
+            seen_amendments.add(doc_id)
+            manifest["amendments"].append({"docID": doc_id, "parentDocID": row.get("parentDocID") or "", "periodEnd": row.get("periodEnd") or "", "status": "needs_review"})
         downloaded = 0
         for row in reversed(selected):
             item = {"periodEnd": row.get("periodEnd") or "", "docID": row.get("docID"), "status": "missing", "reason": ""}
@@ -450,14 +557,15 @@ def main() -> int:
                 manifest["gaps"].append({"from": left, "to": right, "reason": "invalid_period_end"})
         # A successful scan is not sufficient if the requested number of fiscal
         # periods is missing. Never label an unexplained short history as complete.
-        if failed_days or downloaded < len(selected) or manifest["gaps"] or len(selected) < args.history_years:
+        expected_calendar_days = len(calendar_dates(full_start_day, end_day))
+        if failed_days or downloaded < len(selected) or manifest["gaps"] or len(selected) < args.history_years or len(scan_days) != expected_calendar_days:
             manifest["status"] = "incomplete"
-        elif len(selected) == args.history_years:
-            manifest["status"] = "complete"
+        elif manifest["amendments"]:
+            manifest["status"] = "complete_with_amendments"
         else:
-            manifest["status"] = "incomplete"
+            manifest["status"] = "complete"
         OUT.mkdir(parents=True, exist_ok=True)
-        (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        write_json_atomic(OUT / "download_manifest.json", manifest)
         print(json.dumps({"download_manifest": manifest}, ensure_ascii=False), flush=True)
         if manifest["status"] == "incomplete": return 3
     elif args.download_csv:
