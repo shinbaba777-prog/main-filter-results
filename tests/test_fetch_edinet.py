@@ -44,7 +44,7 @@ class FetchEdinetTests(unittest.TestCase):
 
     def test_history_filter_keeps_only_matching_valid_issuer_filings(self):
         rows = [
-            {"docTypeCode": "120", "secCode": "44060", "csvFlag": "1"},
+            {"docTypeCode": "120", "secCode": "44060", "csvFlag": "1", "docID": "ORIG12345"},
             {"docTypeCode": "120", "secCode": "99990", "csvFlag": "1"},
             {"docTypeCode": "120", "secCode": "44060", "csvFlag": "0"},
             {"docTypeCode": "130", "secCode": "44060", "csvFlag": "1", "docID": "AMEND123"},
