@@ -404,16 +404,16 @@ def main() -> int:
         found, failed = scan_dates(full_scan_days, "Full historical amendment audit")
         historical_matches.extend(found)
         failed_days.extend(failed)
-            # Retry failed dates once after a cooldown.
-            if failed_days:
-                time.sleep(60)
-                retry_failed = []
-                for failed_day in sorted(set(failed_days)):
-                    try:
-                        historical_matches.extend(filter_history_rows(fetch_listing(failed_day, api_key), accepted_codes))
-                    except (requests.RequestException, ValueError, RuntimeError):
-                        retry_failed.append(failed_day)
-                failed_days = retry_failed
+        # Retry failed dates once after a cooldown.
+        if failed_days:
+            time.sleep(60)
+            retry_failed = []
+            for failed_day in sorted(set(failed_days)):
+                try:
+                    historical_matches.extend(filter_history_rows(fetch_listing_cached(failed_day, api_key, listing_cache), accepted_codes))
+                except (requests.RequestException, ValueError, RuntimeError):
+                    retry_failed.append(failed_day)
+            failed_days = retry_failed
 
         scan_days = sorted(scanned_days)
         print(f"Historical scan: {len(scan_days)} unique weekday queries; {len(failed_days)} failed after retry.");
