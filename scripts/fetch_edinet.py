@@ -613,7 +613,7 @@ def main() -> int:
                         "periods": [{"periodEnd": matches[0].get("periodEnd") or "", "docID": matches[0].get("docID"),
                                      "status": "missing", "reason": type(exc).__name__}],
                         "gaps": [], "failed_scan_dates": [], "amendments": []}
-            (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(OUT / "download_manifest.json", manifest)
             print(f"ERROR: latest CSV download failed ({type(exc).__name__}); API key and URL redacted.", file=sys.stderr)
             return 3
         selected_row = matches[0]
