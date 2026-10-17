@@ -52,7 +52,7 @@ class FetchEdinetTests(unittest.TestCase):
         ]
         filtered = fetch_edinet.filter_history_rows(rows, {"4406", "44060"})
         self.assertEqual(len(filtered), 3)
-        self.assertEqual({r["docID"] for r in filtered}, {"AMEND123", "TEXT123"})
+        self.assertEqual({r["docID"] for r in filtered}, {"ORIG12345", "AMEND123", "TEXT123"})
 
 
 
