@@ -205,6 +205,16 @@ def write_metadata(rows: list[dict]) -> None:
 def download_csv_zip(row: dict, api_key: str) -> Path:
     doc_id = str(row.get("docID") or "")
     if not DOC_RE.fullmatch(doc_id): raise EdinetError("Selected document has invalid docID")
+    code = normalize_code(row.get("secCode")) or "unknown"
+    path = OUT / f"{code}_{doc_id}_xbrl_csv.zip"
+    # Reuse an existing CRC-valid ZIP before making a network request.
+    if path.exists():
+        try:
+            with zipfile.ZipFile(path) as zf:
+                if zf.testzip() is None:
+                    return path
+        except (zipfile.BadZipFile, OSError):
+            pass
     response = api_get(f"documents/{doc_id}", {"type": "5"}, api_key, f"CSV download {doc_id}")
     if "json" in response.headers.get("Content-Type", "").lower():
         _, message = api_error(response)
@@ -216,14 +226,7 @@ def download_csv_zip(row: dict, api_key: str) -> Path:
         with zipfile.ZipFile(payload) as zf:
             if zf.testzip(): raise EdinetError(f"EDINET ZIP for {doc_id} failed CRC validation")
     except zipfile.BadZipFile: raise EdinetError(f"EDINET ZIP for {doc_id} is corrupt") from None
-    code = normalize_code(row.get("secCode")) or "unknown"
-    path = OUT / f"{code}_{doc_id}_xbrl_csv.zip"
     OUT.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        try:
-            with zipfile.ZipFile(path) as zf:
-                if zf.testzip() is None: return path
-        except (zipfile.BadZipFile, OSError): pass
     fd, temp_name = tempfile.mkstemp(prefix=".edinet-", suffix=".tmp", dir=OUT)
     try:
         with os.fdopen(fd, "wb") as f:
