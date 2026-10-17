@@ -102,7 +102,8 @@ jobs:
           retention-days: 14
 
       - name: Commit refreshed EDINET data
-        if: ${{ always() }}
+        # Never let a candidate-branch workflow write generated data to main.
+        if: ${{ always() && github.ref == 'refs/heads/main' }}
         run: |
           # Preserve previously extracted/reviewed data if the latest metadata fetch fails.
           # A failed refresh must never delete the existing review queue.
