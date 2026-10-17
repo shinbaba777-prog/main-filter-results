@@ -167,16 +167,28 @@ def weekday_dates(start_day: date, end_day: date) -> list[date]:
 
 
 def filter_history_rows(rows: list[dict], accepted_codes: set[str]) -> list[dict]:
-    """Keep valid annual report originals and amendments for the requested issuer."""
-    return [
-        row for row in rows
-        if str(row.get("docTypeCode", "")) in ANNUAL_REPORT_CODES
-        and normalize_code(row.get("secCode")) in accepted_codes
-        and str(row.get("csvFlag", "")) == "1"
-        and str(row.get("legalStatus", "1")) in {"1", "2"}
-        and str(row.get("withdrawalStatus", "0")) not in {"1", "2"}
-        and str(row.get("docInfoEditStatus", "1")) != "2"
-    ]
+    """Keep live annual-report originals and amendments for the requested issuer.
+
+    Original annual reports require a downloadable CSV. Amendments remain visible even
+    when csvFlag=0, because text-only corrections still require human review.
+    """
+    kept = []
+    for row in rows:
+        doc_type = str(row.get("docTypeCode", ""))
+        if doc_type not in ANNUAL_REPORT_CODES:
+            continue
+        if normalize_code(row.get("secCode")) not in accepted_codes:
+            continue
+        if str(row.get("legalStatus", "1")) not in {"1", "2"}:
+            continue
+        if str(row.get("withdrawalStatus", "0")) in {"1", "2"}:
+            continue
+        if str(row.get("docInfoEditStatus", "1")) == "2":
+            continue
+        if doc_type == "120" and str(row.get("csvFlag", "")) != "1":
+            continue
+        kept.append(row)
+    return kept
 
 
 def write_metadata(rows: list[dict]) -> None:
@@ -433,14 +445,14 @@ def main() -> int:
                     manifest["gaps"].append({"from": left, "to": right, "reason": "period_gap_over_400_days"})
             except ValueError:
                 manifest["gaps"].append({"from": left, "to": right, "reason": "invalid_period_end"})
-        if failed_days or downloaded < len(selected) or manifest["gaps"]:
+        # A successful scan is not sufficient if the requested number of fiscal
+        # periods is missing. Never label an unexplained short history as complete.
+        if failed_days or downloaded < len(selected) or manifest["gaps"] or len(selected) < args.history_years:
             manifest["status"] = "incomplete"
         elif len(selected) == args.history_years:
             manifest["status"] = "complete"
         else:
-            # Fewer periods can be legitimate for a newly listed issuer only when
-            # the scan itself succeeded and the periods show no unexplained gap.
-            manifest["status"] = "complete_short_history"
+            manifest["status"] = "incomplete"
         OUT.mkdir(parents=True, exist_ok=True)
         (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps({"download_manifest": manifest}, ensure_ascii=False), flush=True)
