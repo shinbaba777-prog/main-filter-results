@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Orchestrate the safe Main Filter 2.3.1 data-to-judgment pipeline.
-
-This stage creates a deterministic readiness report. It never approves EDINET
-facts, invents market inputs, scores an unverified company, or writes index.csv.
-"""
-from __future__ import annotations
+"""Conservative readiness gate for Main Filter 2.3.1."""
 import argparse
 import csv
 import json
@@ -12,11 +7,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EDINET = ROOT / "data" / "edinet"
-EXTRACTED = EDINET / "extracted"
+DATA = ROOT / "data" / "edinet"
+EXTRACTED = DATA / "extracted"
 
 
-def read_json(path: Path) -> dict:
+def load_json(path):
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
         return value if isinstance(value, dict) else {}
@@ -24,145 +19,90 @@ def read_json(path: Path) -> dict:
         return {}
 
 
-def csv_count(path: Path) -> int:
+def load_csv(path):
     try:
-        with path.open("r", encoding="utf-8-sig", newline="") as f:
-            return max(0, sum(1 for _ in csv.DictReader(f)))
+        with path.open(encoding="utf-8-sig", newline="") as stream:
+            return list(csv.DictReader(stream))
     except OSError:
-        return 0
+        return []
 
 
-def main() -> int:
+def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--code", required=True, help="Japanese security code")
-    ap.add_argument("--company", default="", help="Company name if known")
+    ap.add_argument("--code", required=True)
+    ap.add_argument("--company", default="")
     ap.add_argument("--out", default="data/edinet/pipeline_readiness.json")
     args = ap.parse_args()
-
-    manifest = read_json(EDINET / "download_manifest.json")
-    extraction = read_json(EXTRACTED / "extraction_summary.json")
-    audit = read_json(EXTRACTED / "financial_metric_audit_summary.json")
-    core = read_json(EXTRACTED / "core_metric_review_queue_summary.json")
-    annual = read_json(EXTRACTED / "annual_metrics_review_summary.json")
-
-    manifest_code = str(manifest.get("requested_code") or manifest.get("security_code") or "")
+    manifest = load_json(DATA / "download_manifest.json")
     periods = manifest.get("periods", [])
     periods = periods if isinstance(periods, list) else []
-    relevant = [p for p in periods if str(p.get("security_code") or p.get("code") or args.code) in ("", args.code)]
-    downloaded = [p for p in relevant if p.get("status") == "downloaded" and p.get("file")]
+    downloaded = [p for p in periods if p.get("status") == "downloaded" and p.get("file")]
+    expected = manifest.get("expected_periods", manifest.get("fiscal_periods", [])) or periods
     gaps = manifest.get("gaps", []) or []
-    failed_dates = manifest.get("failed_scan_dates", []) or []
-    missing_periods = manifest.get("missing_expected_periods", []) or []
-    expected = manifest.get("expected_periods", manifest.get("fiscal_periods", [])) or []
-    requested_periods = int(manifest.get("requested_periods") or 0)
-    if not expected and periods:
-        expected = periods
-    candidate_rows = csv_count(EXTRACTED / "financial_metric_candidates.csv")
-    audit_rows = csv_count(EXTRACTED / "financial_metric_audit.csv")
-    queue_rows = csv_count(EXTRACTED / "core_metric_review_queue.csv")
-    approved_rows = 0
-    queue = EXTRACTED / "core_metric_review_queue.csv"
-    try:
-        with queue.open("r", encoding="utf-8-sig", newline="") as f:
-            approved_rows = sum(1 for row in csv.DictReader(f)
-                                if str(row.get("review_status", "")).strip().upper() == "APPROVED"
-                                and str(row.get("review_reason", "")).strip() == "APPROVED_SOURCE_VERIFIED")
-    except OSError:
-        pass
-
+    failed = manifest.get("failed_scan_dates", []) or []
+    missing = manifest.get("missing_expected_periods", []) or []
+    amendments = manifest.get("amendments", []) or []
+    candidates = load_csv(EXTRACTED / "financial_metric_candidates.csv")
+    audits = load_csv(EXTRACTED / "financial_metric_audit.csv")
+    queue = load_csv(EXTRACTED / "core_metric_review_queue.csv")
+    approved = [r for r in queue if r.get("review_status", "").strip().upper() == "APPROVED"
+                and r.get("review_reason", "").strip() == "APPROVED_SOURCE_VERIFIED"]
     blockers = []
-    if manifest.get("status") not in ("complete", "complete_short_history", "complete_with_amendments"):
+    manifest_status = manifest.get("status", "MISSING")
+    if manifest_status not in ("complete", "complete_short_history", "complete_with_amendments"):
         blockers.append("EDINET manifest is not complete")
-    if gaps:
+    if gaps or missing:
         blockers.append("Expected fiscal periods have gaps")
-    if failed_dates:
-        blockers.append("EDINET scan dates failed; zero-result is not proof of no filing")
-    if requested_periods and len(downloaded) < requested_periods and manifest.get("status") != "complete_short_history":
-        blockers.append("Expected annual filing count is not satisfied")
+    if failed:
+        blockers.append("Some EDINET scan dates failed")
+    requested = manifest.get("requested_periods")
+    if requested is not None and manifest_status != "complete_short_history":
+        try:
+            if len(downloaded) < int(requested):
+                blockers.append("Expected annual filing count is not satisfied")
+        except (ValueError, TypeError):
+            blockers.append("Requested annual filing count is invalid")
     if not downloaded:
-        blockers.append("No downloaded annual filing is recorded in the manifest")
-    if not (EXTRACTED / "financial_metric_candidates.csv").exists():
-        blockers.append("Financial candidate extraction is missing")
-    if not (EXTRACTED / "financial_metric_audit.csv").exists():
-        blockers.append("Candidate audit is missing")
-    if approved_rows == 0:
-        blockers.append("No facts have been explicitly source-verified and approved")
+        blockers.append("No downloaded annual filings")
+    if not candidates or not audits or not queue:
+        blockers.append("Candidate extraction, audit, or review queue is missing/empty")
+    if amendments:
+        blockers.append("Amendments require reconciliation against original filings")
+    if not approved:
+        blockers.append("No source-verified facts have been approved")
     blockers.extend([
-        "Market price/PER and same-market/industry benchmark are not independently verified by this pipeline",
-        "JPX institutional short history and five-business-day IR excess return are not verified by this pipeline",
-        "ROIC/WACC, net debt/EBITDA, dilution, forecast/scenario and BUY-block inputs require verified calculations",
+        "Price/PER and market/industry benchmarks still need verified inputs",
+        "JPX short positions and five-business-day IR excess returns still need verified inputs",
+        "ROIC/WACC, net debt/EBITDA, dilution, forecast and scenario checks still need verified inputs",
     ])
-
-    status = {
+    report = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "security_code": args.code,
-        "company": args.company,
-        "pipeline_stage": "DATA_COLLECTION_AND_JUDGMENT_READINESS",
-        "source_manifest_status": manifest.get("status", "MISSING"),
-        "manifest_code": manifest_code,
+        "security_code": args.code, "company": args.company,
+        "manifest_status": manifest_status,
         "downloaded_period_count": len(downloaded),
         "expected_period_count": len(expected) if isinstance(expected, list) else 0,
-        "gap_count": len(gaps),
-        "failed_scan_date_count": len(failed_dates),
-        "missing_expected_periods": missing_periods,
-        "extraction_summary_present": bool(extraction),
-        "candidate_rows": candidate_rows,
-        "audit_rows": audit_rows,
-        "review_queue_rows": queue_rows,
-        "explicitly_source_verified_approved_rows": approved_rows,
-        "readiness": "READY_FOR_MANUAL_SOURCE_RECONCILIATION" if approved_rows else "BLOCKED_DATA_REVIEW_REQUIRED",
-        "formal_scoring_allowed": False,
-        "index_csv_write_allowed": False,
+        "gap_count": len(gaps), "failed_scan_date_count": len(failed),
+        "missing_expected_periods": missing, "amendment_count": len(amendments),
+        "candidate_rows": len(candidates), "audit_rows": len(audits),
+        "review_queue_rows": len(queue), "approved_rows": len(approved),
+        "readiness": "BLOCKED_DATA_REVIEW_REQUIRED",
+        "formal_scoring_allowed": False, "index_csv_write_allowed": False,
         "blockers": blockers,
-        "required_next_steps": [
-            "Resolve all manifest gaps and failed scan dates; confirm all expected fiscal periods and amendments.",
-            "Verify each metric against the original filing: fiscal year, consolidated scope, accounting standard, duration/instant, unit and scale, sign, concept definition, and corrections.",
-            "Only then mark the exact queue row APPROVED with review_reason=APPROVED_SOURCE_VERIFIED.",
-            "Independently collect and verify price/PER, sector benchmarks, JPX short positions, IR/index reaction, ROIC/WACC, net debt, dilution, forecast and scenario inputs.",
-            "Run prepare_analysis.py and record_verified_analysis.py --dry-run; inspect scoring and BUY blocks before any formal record.",
-            "Only after review, record the approved analysis and verify index.csv plus Pages deployment."
-        ],
     }
     out = ROOT / args.out
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(status, ensure_ascii=False, indent=2) + "
-", encoding="utf-8")
-    md = out.with_suffix(".md")
-    md.write_text(
-        "# Main Filter 2.3.1 pipeline readiness
-
-"
-        f"- Code: {args.code} {args.company}
-"
-        f"- Generated (UTC): {status['generated_at_utc']}
-"
-        f"- EDINET manifest: {status['source_manifest_status']}
-"
-        f"- Downloaded annual periods: {len(downloaded)}; expected periods listed: {len(expected) if isinstance(expected, list) else 0}
-"
-        f"- Candidate/audit/review rows: {candidate_rows}/{audit_rows}/{queue_rows}
-"
-        f"- Explicitly source-verified approved facts: {approved_rows}
-"
-        f"- Readiness: **{status['readiness']}**
-"
-        "- Formal scoring allowed: **NO**
-"
-        "- index.csv write allowed: **NO**
-
-"
-        "## Blockers
-" + "".join(f"- {x}
-" for x in blockers) + "
-"
-        "## Required next steps
-" + "".join(f"{i}. {x}
-" for i, x in enumerate(status["required_next_steps"], 1)),
-        encoding="utf-8"
-    )
-    print(json.dumps({"readiness": status["readiness"], "candidate_rows": candidate_rows,
-                      "approved_rows": approved_rows, "blockers": len(blockers),
-                      "json": str(out), "markdown": str(md)}, ensure_ascii=False))
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    md = ["# Main Filter 2.3.1 pipeline readiness", "",
+          f"- Code: {args.code} {args.company}",
+          f"- EDINET manifest: {manifest_status}",
+          f"- Periods downloaded: {len(downloaded)}",
+          f"- Candidate/audit/queue rows: {len(candidates)}/{len(audits)}/{len(queue)}",
+          f"- Approved source-verified facts: {len(approved)}",
+          "- Formal scoring allowed: NO", "- index.csv write allowed: NO", "",
+          "## Blockers", *[f"- {x}" for x in blockers], ""]
+    out.with_suffix(".md").write_text("\n".join(md), encoding="utf-8")
+    print(json.dumps({"readiness": report["readiness"], "blockers": len(blockers),
+                      "downloaded_periods": len(downloaded)}, ensure_ascii=False))
     return 0
 
 
