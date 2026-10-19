@@ -51,7 +51,7 @@ def main() -> int:
     relevant = [p for p in periods if str(p.get("security_code") or p.get("code") or args.code) in ("", args.code)]
     downloaded = [p for p in relevant if p.get("status") == "downloaded" and p.get("file")]
     gaps = manifest.get("gaps", []) or []
-    failed_dates = manifest.get("failed_scan_dates", []) or []
+    failed_dates = manifest.get("failed_scan_dates", []) or []\n    missing_periods = manifest.get("missing_expected_periods", []) or []
     expected = manifest.get("expected_periods", manifest.get("fiscal_periods", [])) or []\n    requested_periods = int(manifest.get("requested_periods") or 0)\n    if not expected and periods:\n        expected = periods
     candidate_rows = csv_count(EXTRACTED / "financial_metric_candidates.csv")
     audit_rows = csv_count(EXTRACTED / "financial_metric_audit.csv")
@@ -99,7 +99,7 @@ def main() -> int:
         "downloaded_period_count": len(downloaded),
         "expected_period_count": len(expected) if isinstance(expected, list) else 0,
         "gap_count": len(gaps),
-        "failed_scan_date_count": len(failed_dates),
+        "failed_scan_date_count": len(failed_dates),\n        "missing_expected_periods": missing_periods,
         "extraction_summary_present": bool(extraction),
         "candidate_rows": candidate_rows,
         "audit_rows": audit_rows,
