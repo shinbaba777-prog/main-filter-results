@@ -88,18 +88,58 @@ jobs:
         if: ${{ steps.fetch.outcome == 'success' && (inputs.download_csv || inputs.download_history) }}
         run: python scripts/build_edinet_core_metric_review.py
 
+      - name: Prepare scoped review artifact
+        if: ${{ steps.fetch.outcome == 'success' && (inputs.download_csv || inputs.download_history) }}
+        env:
+          SECURITIES_CODE: ${{ inputs.securities_code }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          root = Path("data/edinet")
+          out = root / "review_artifact"
+          if out.exists():
+              shutil.rmtree(out)
+          out.mkdir(parents=True)
+          manifest_path = root / "download_manifest.json"
+          shutil.copy2(manifest_path, out / "download_manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          copied = set()
+          for period in manifest.get("periods", []):
+              filename = period.get("file")
+              if not filename:
+                  continue
+              source = root / Path(filename).name
+              if source.is_file():
+                  shutil.copy2(source, out / source.name)
+                  copied.add(source.name)
+          extracted = root / "extracted"
+          for filename in (
+              "financial_metric_candidates.csv",
+              "core_metric_review_queue.csv",
+              "core_metric_review_queue_summary.json",
+          ):
+              source = extracted / filename
+              if source.is_file():
+                  shutil.copy2(source, out / filename)
+          print(json.dumps({
+              "requested_code": os.environ.get("SECURITIES_CODE", ""),
+              "manifest_period_zip_count": len(copied),
+              "zip_files": sorted(copied),
+              "status": manifest.get("status"),
+          }, ensure_ascii=False))
+          PY
+
       - name: Publish EDINET review files as a downloadable artifact
         if: ${{ steps.fetch.outcome == 'success' && (inputs.download_csv || inputs.download_history) }}
         uses: actions/upload-artifact@v4
         with:
           name: edinet-review-${{ github.run_id }}
-          path: |
-            data/edinet/download_manifest.json
-            data/edinet/*_xbrl_csv.zip
-            data/edinet/extracted/financial_metric_candidates.csv
-            data/edinet/extracted/core_metric_review_queue.csv
-            data/edinet/extracted/core_metric_review_queue_summary.json
-          if-no-files-found: warn
+          path: data/edinet/review_artifact/**
+          if-no-files-found: error
           retention-days: 14
 
       - name: Commit refreshed EDINET data
