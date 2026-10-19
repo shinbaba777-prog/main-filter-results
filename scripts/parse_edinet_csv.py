@@ -80,7 +80,7 @@ def main():
         if not manifest_path.exists():
             raise SystemExit("Missing download_manifest.json; refusing to glob old ZIP files")
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if manifest.get("status") not in ("complete", "complete_short_history") and not args.allow_incomplete:
+        if manifest.get("status") not in ("complete", "complete_short_history", "complete_with_amendments") and not args.allow_incomplete:
             raise SystemExit("Download manifest is incomplete; extraction refused. Use --allow-incomplete for diagnostics only.")
         zips = [DATA / item["file"] for item in manifest.get("periods", []) if item.get("status") == "downloaded" and item.get("file")]
     else:
