@@ -95,6 +95,7 @@ jobs:
           name: edinet-review-${{ github.run_id }}
           path: |
             data/edinet/download_manifest.json
+            data/edinet/*_xbrl_csv.zip
             data/edinet/extracted/financial_metric_candidates.csv
             data/edinet/extracted/core_metric_review_queue.csv
             data/edinet/extracted/core_metric_review_queue_summary.json
