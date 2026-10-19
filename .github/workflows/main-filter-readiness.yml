@@ -1,0 +1,91 @@
+name: Main Filter 2.3.1 end-to-end data readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      securities_code:
+        description: "Japanese security code (e.g. 4406)"
+        required: true
+        type: string
+      company_name:
+        description: "Company name (optional)"
+        required: false
+        default: ""
+        type: string
+      history_years:
+        description: "Annual filing history (max 5 fiscal periods)"
+        required: true
+        default: "5"
+        type: choice
+        options:
+          - "5"
+          - "3"
+          - "1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-filter-readiness-${{ inputs.securities_code }}
+  cancel-in-progress: false
+
+jobs:
+  collect-and-assess-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependency
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Compile and run offline tests
+        run: |
+          python -m compileall -q scripts tests
+          python -m unittest discover -s tests -v
+      - name: Fetch EDINET filings
+        env:
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+          CODE: ${{ inputs.securities_code }}
+          YEARS: ${{ inputs.history_years }}
+        run: |
+          test -n "$EDINET_API_KEY" || { echo "Missing repository secret EDINET_API_KEY"; exit 2; }
+          case "$YEARS" in
+            1) DAYS=30 ;;
+            3) DAYS=180 ;;
+            5) DAYS=180 ;;
+            *) echo "Unsupported history_years=$YEARS"; exit 2 ;;
+          esac
+          python scripts/fetch_edinet.py --days "$DAYS" --download-csv --history-years "$YEARS" --code "$CODE"
+      - name: Extract XBRL facts (review candidates only)
+        run: python scripts/parse_edinet_csv.py
+      - name: Validate candidate rows
+        run: python scripts/validate_edinet_candidates.py
+      - name: Build core metric review queue
+        run: python scripts/build_edinet_core_metric_review.py
+      - name: Build annual metrics review
+        run: |
+          if [ -f scripts/build_edinet_annual_metrics_review.py ]; then
+            python scripts/build_edinet_annual_metrics_review.py
+          fi
+      - name: Build pipeline readiness report
+        env:
+          CODE: ${{ inputs.securities_code }}
+          COMPANY: ${{ inputs.company_name }}
+        run: |
+          python scripts/main_filter_pipeline.py --code "$CODE" --company "$COMPANY"
+          cat data/edinet/pipeline_readiness.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload complete review package
+        uses: actions/upload-artifact@v4
+        with:
+          name: main-filter-readiness-${{ inputs.securities_code }}-${{ github.run_id }}
+          path: |
+            data/edinet/download_manifest.json
+            data/edinet/pipeline_readiness.json
+            data/edinet/pipeline_readiness.md
+            data/edinet/extracted/**
+          if-no-files-found: error
+          retention-days: 14
