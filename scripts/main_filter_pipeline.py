@@ -51,8 +51,12 @@ def main() -> int:
     relevant = [p for p in periods if str(p.get("security_code") or p.get("code") or args.code) in ("", args.code)]
     downloaded = [p for p in relevant if p.get("status") == "downloaded" and p.get("file")]
     gaps = manifest.get("gaps", []) or []
-    failed_dates = manifest.get("failed_scan_dates", []) or []\n    missing_periods = manifest.get("missing_expected_periods", []) or []
-    expected = manifest.get("expected_periods", manifest.get("fiscal_periods", [])) or []\n    requested_periods = int(manifest.get("requested_periods") or 0)\n    if not expected and periods:\n        expected = periods
+    failed_dates = manifest.get("failed_scan_dates", []) or []
+    missing_periods = manifest.get("missing_expected_periods", []) or []
+    expected = manifest.get("expected_periods", manifest.get("fiscal_periods", [])) or []
+    requested_periods = int(manifest.get("requested_periods") or 0)
+    if not expected and periods:
+        expected = periods
     candidate_rows = csv_count(EXTRACTED / "financial_metric_candidates.csv")
     audit_rows = csv_count(EXTRACTED / "financial_metric_audit.csv")
     queue_rows = csv_count(EXTRACTED / "core_metric_review_queue.csv")
@@ -99,7 +103,8 @@ def main() -> int:
         "downloaded_period_count": len(downloaded),
         "expected_period_count": len(expected) if isinstance(expected, list) else 0,
         "gap_count": len(gaps),
-        "failed_scan_date_count": len(failed_dates),\n        "missing_expected_periods": missing_periods,
+        "failed_scan_date_count": len(failed_dates),
+        "missing_expected_periods": missing_periods,
         "extraction_summary_present": bool(extraction),
         "candidate_rows": candidate_rows,
         "audit_rows": audit_rows,
@@ -120,21 +125,39 @@ def main() -> int:
     }
     out = ROOT / args.out
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(status, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    out.write_text(json.dumps(status, ensure_ascii=False, indent=2) + "
+", encoding="utf-8")
     md = out.with_suffix(".md")
     md.write_text(
-        "# Main Filter 2.3.1 pipeline readiness\n\n"
-        f"- Code: {args.code} {args.company}\n"
-        f"- Generated (UTC): {status['generated_at_utc']}\n"
-        f"- EDINET manifest: {status['source_manifest_status']}\n"
-        f"- Downloaded annual periods: {len(downloaded)}; expected periods listed: {len(expected) if isinstance(expected, list) else 0}\n"
-        f"- Candidate/audit/review rows: {candidate_rows}/{audit_rows}/{queue_rows}\n"
-        f"- Explicitly source-verified approved facts: {approved_rows}\n"
-        f"- Readiness: **{status['readiness']}**\n"
-        "- Formal scoring allowed: **NO**\n"
-        "- index.csv write allowed: **NO**\n\n"
-        "## Blockers\n" + "".join(f"- {x}\n" for x in blockers) + "\n"
-        "## Required next steps\n" + "".join(f"{i}. {x}\n" for i, x in enumerate(status["required_next_steps"], 1)),
+        "# Main Filter 2.3.1 pipeline readiness
+
+"
+        f"- Code: {args.code} {args.company}
+"
+        f"- Generated (UTC): {status['generated_at_utc']}
+"
+        f"- EDINET manifest: {status['source_manifest_status']}
+"
+        f"- Downloaded annual periods: {len(downloaded)}; expected periods listed: {len(expected) if isinstance(expected, list) else 0}
+"
+        f"- Candidate/audit/review rows: {candidate_rows}/{audit_rows}/{queue_rows}
+"
+        f"- Explicitly source-verified approved facts: {approved_rows}
+"
+        f"- Readiness: **{status['readiness']}**
+"
+        "- Formal scoring allowed: **NO**
+"
+        "- index.csv write allowed: **NO**
+
+"
+        "## Blockers
+" + "".join(f"- {x}
+" for x in blockers) + "
+"
+        "## Required next steps
+" + "".join(f"{i}. {x}
+" for i, x in enumerate(status["required_next_steps"], 1)),
         encoding="utf-8"
     )
     print(json.dumps({"readiness": status["readiness"], "candidate_rows": candidate_rows,
