@@ -52,7 +52,7 @@ def main() -> int:
     downloaded = [p for p in relevant if p.get("status") == "downloaded" and p.get("file")]
     gaps = manifest.get("gaps", []) or []
     failed_dates = manifest.get("failed_scan_dates", []) or []
-    expected = manifest.get("expected_periods", manifest.get("fiscal_periods", [])) or []
+    expected = manifest.get("expected_periods", manifest.get("fiscal_periods", [])) or []\n    requested_periods = int(manifest.get("requested_periods") or 0)\n    if not expected and periods:\n        expected = periods
     candidate_rows = csv_count(EXTRACTED / "financial_metric_candidates.csv")
     audit_rows = csv_count(EXTRACTED / "financial_metric_audit.csv")
     queue_rows = csv_count(EXTRACTED / "core_metric_review_queue.csv")
@@ -67,13 +67,13 @@ def main() -> int:
         pass
 
     blockers = []
-    if manifest.get("status") not in ("complete", "complete_short_history"):
+    if manifest.get("status") not in ("complete", "complete_short_history", "complete_with_amendments"):
         blockers.append("EDINET manifest is not complete")
     if gaps:
         blockers.append("Expected fiscal periods have gaps")
     if failed_dates:
         blockers.append("EDINET scan dates failed; zero-result is not proof of no filing")
-    if expected and len(downloaded) < min(5, len(expected)):
+    if requested_periods and len(downloaded) < requested_periods and manifest.get("status") != "complete_short_history":
         blockers.append("Expected annual filing count is not satisfied")
     if not downloaded:
         blockers.append("No downloaded annual filing is recorded in the manifest")
