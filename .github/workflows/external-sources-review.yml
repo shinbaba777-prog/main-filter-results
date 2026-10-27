@@ -1,0 +1,25 @@
+name: External source review snapshot (4406)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - scripts/collect_external_sources_review.py
+      - .github/workflows/external-sources-review.yml
+permissions:
+  contents: read
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch source pages into review-only JSON
+        run: python3 scripts/collect_external_sources_review.py --code 4406
+      - name: Upload review artifact (never modify index.csv)
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-sources-4406
+          path: artifacts/source_snapshots/4406.json
+          retention-days: 14
