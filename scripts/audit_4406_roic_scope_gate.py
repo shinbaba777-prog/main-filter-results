@@ -16,7 +16,7 @@ def audit(data):
     for doc in data["documents"]:
         rows = doc["candidates"]
         current = {}
-        individual_lease = []
+        individual_lease = []\n        conflicts = []
         for row in rows:
             context = row.get("context", {})
             dims = context.get("dimensions", [])
@@ -31,10 +31,10 @@ def audit(data):
             expected = "CurrentYearDuration" if row["concept"] in REQUIRED[:3] else "CurrentYearInstant"
             if row["context_id"] != expected:
                 continue
-            current[row["concept"]] = row
+            if row["concept"] in current and (row.get("value"), row.get("unit_ref")) != (current[row["concept"]].get("value"), current[row["concept"]].get("unit_ref")):\n                conflicts.append(row["concept"])\n            current[row["concept"]] = row
         missing = sorted(set(REQUIRED) - set(current))
         results.append({"document_id": doc["document_id"], "matched_required": sorted(current),
-                        "missing_required": missing,
+                        "missing_required": missing, "conflicting_duplicate_concepts": sorted(set(conflicts)),
                         "individual_lease_not_usable_for_consolidated_roic": sorted(set(individual_lease)),
                         "unresolved_balances": list(UNCERTAIN),
                         "roic_verified": False})
