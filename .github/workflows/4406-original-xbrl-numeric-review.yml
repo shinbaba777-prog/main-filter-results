@@ -1,0 +1,47 @@
+name: 4406 original XBRL exact numeric reconciliation (review only)
+on:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - .github/workflows/4406-original-xbrl-numeric-review.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare existing 35-row review inventory
+        run: |
+          python3 scripts/reconcile_4406_xbrl_current_year.py
+          python3 scripts/review_4406_roe_units.py
+          python3 scripts/review_4406_consolidation_scope.py
+      - name: Retrieve successful original XBRL evidence artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/actions/artifacts/12778943115/zip > /tmp/original-xbrl-evidence.zip
+          unzip -p /tmp/original-xbrl-evidence.zip 4406_original_xbrl_facts_linkbases.json > artifacts/4406_original_xbrl_facts_linkbases.json
+          test -s artifacts/4406_original_xbrl_facts_linkbases.json
+      - name: Compare all 35 original XBRL facts with source CSV audit values
+        run: |
+          python3 scripts/reconcile_4406_original_xbrl_35_values.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path("artifacts/4406_original_xbrl_35_numeric_reconciliation.json").read_text())
+          assert p["numeric_matches"]==35 and p["numeric_mismatches"]==0
+          assert p["approved_rows"]==0 and p["scoring_eligible"] is False and p["publish_to_index"] is False
+          print("PASS: 35/35 original fact numeric and unit matches, publication blocked")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 4406-original-xbrl-35-numeric-evidence
+          path: artifacts/4406_original_xbrl_35_numeric_reconciliation.json
+          if-no-files-found: warn
+          retention-days: 14
