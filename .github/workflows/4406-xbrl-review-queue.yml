@@ -1,0 +1,27 @@
+name: 4406 XBRL 680-row review queue (no scoring)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - scripts/build_4406_xbrl_review_queue.py
+      - tests/test_4406_xbrl_review_queue.py
+      - .github/workflows/4406-xbrl-review-queue.yml
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test fail-closed review queue
+        run: python3 -m unittest discover -s tests -p 'test_4406_xbrl_review_queue.py' -v
+      - name: Summarize original 680 candidate audit rows
+        run: python3 scripts/build_4406_xbrl_review_queue.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 4406-xbrl-review-queue
+          path: artifacts/4406_xbrl_review_queue.json
+          retention-days: 14
