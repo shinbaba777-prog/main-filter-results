@@ -1,0 +1,25 @@
+name: EDINET safe integration checks
+
+on:
+  pull_request:
+    paths:
+      - "scripts/check_edinet_readiness.py"
+      - "tests/test_check_edinet_readiness.py"
+      - ".github/workflows/edinet-safe-pr-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile new code
+        run: python3 -m py_compile scripts/check_edinet_readiness.py tests/test_check_edinet_readiness.py
+      - name: Run all offline tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Check 4406 acquisition status (read only)
+        run: python3 scripts/check_edinet_readiness.py --code 4406
