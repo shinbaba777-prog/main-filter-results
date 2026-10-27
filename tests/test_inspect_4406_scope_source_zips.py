@@ -23,6 +23,13 @@ class ZipSourceTests(unittest.TestCase):
             self.assertEqual(r["source_csv_files_verified"],35)
             self.assertEqual(r["approved_rows"],0)
             self.assertFalse(r["scoring_eligible"])
+    def test_tab_delimited_source_header(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp);f=fixture(folder)
+            with zipfile.ZipFile(folder/"44060_DOC0_xbrl_csv.zip","w") as z:
+                z.writestr("source.csv","要素ID\\t項目名\\tコンテキストID\\nexample\\t売上高\\tCurrentYearDuration\\n".encode("utf-16"))
+            out=inspect(f,folder)
+            self.assertEqual(out["rows"][0]["source_csv_columns"],["要素ID","項目名","コンテキストID"])
     def test_utf16_source_csv(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder=Path(tmp);f=fixture(folder)
