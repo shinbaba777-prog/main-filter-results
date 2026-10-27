@@ -6,6 +6,7 @@ on:
       - feature/source-provenance-report-20261028
     paths:
       - scripts/bridge_4406_review_to_scoring.py
+      - tests/test_4406_scoring_bridge.py
       - .github/workflows/4406-scoring-bridge-dry-run.yml
 permissions:
   contents: read
@@ -15,6 +16,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Test bridge fail-closed invariants
+        run: python3 -m unittest discover -s tests -p 'test_4406_scoring_bridge.py' -v
       - name: Verify source values
         run: python3 scripts/verify_4406_primary_sources.py
       - name: Build evidence inventory
