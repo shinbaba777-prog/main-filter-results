@@ -1,0 +1,24 @@
+name: Test 4406 evidence inventory gate (isolated)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - scripts/build_4406_evidence_inventory.py
+      - tests/test_build_4406_evidence_inventory.py
+      - .github/workflows/test-4406-evidence-inventory-gate.yml
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run inventory fail-closed tests
+        run: python3 -m unittest discover -s tests -p 'test_build_4406_evidence_inventory.py' -v
+      - name: Verify and build inventory
+        run: |
+          python3 scripts/verify_4406_primary_sources.py
+          python3 -m scripts.build_4406_evidence_inventory
