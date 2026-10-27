@@ -52,8 +52,7 @@ def main():
     args = parser.parse_args()
     result = audit(json.loads(args.inventory.read_text(encoding="utf-8")))
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2)+"
-", encoding="utf-8")
+    args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2)+chr(10), encoding="utf-8")
     for row in result["documents"]:
         print(row["document_id"], "required", len(row["matched_required"]), "/", len(REQUIRED),
               "unresolved", len(row["unresolved_balances"]))
