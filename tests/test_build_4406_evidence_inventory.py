@@ -5,7 +5,7 @@ from scripts.verify_4406_primary_sources import EXPECTED, FIELDS
 def fixtures():
     rows=[]
     for year, values in EXPECTED.items():
-        r={"fiscal_year_end":year,"security_code":"4406","consolidation_scope":"連結","document_id":"DOC"+year[:4]}
+        r={"fiscal_year_end":year,"security_code":"4406","consolidation_scope":"連結","document_id":"DOC"+year[:4],"source_file":"DOC"+year[:4]+".zip"}
         r.update({field:str(value) for field,value in zip(FIELDS,values)})
         rows.append(r)
     return rows
@@ -30,6 +30,18 @@ class InventoryGateTests(unittest.TestCase):
 
     def test_rejects_missing_year(self):
         with self.assertRaises(ValueError):build(fixtures()[:-1],audit())
+
+    def test_rejects_missing_document_id(self):
+        x=fixtures();x[0]["document_id"]=""
+        with self.assertRaises(ValueError):build(x,audit())
+
+    def test_rejects_duplicate_document_id(self):
+        x=fixtures();x[0]["document_id"]=x[1]["document_id"]
+        with self.assertRaises(ValueError):build(x,audit())
+
+    def test_rejects_missing_source_file(self):
+        x=fixtures();x[0]["source_file"]=""
+        with self.assertRaises(ValueError):build(x,audit())
 
 if __name__=="__main__":
     unittest.main()
