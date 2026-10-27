@@ -31,7 +31,7 @@ class ScopeGateTests(unittest.TestCase):
         result=audit({"documents":[{"document_id":"S100YGXD","candidates":rows}]})
         self.assertIn("NetAssets",result["documents"][0]["missing_required"])
 
-    def test_nonstandard_context_not_accepted(self):
+    def test_conflicting_duplicate_is_flagged(self):\n        a=fact("NetAssets","CurrentYearInstant")\n        b=fact("NetAssets","CurrentYearInstant")\n        b["value"]="456"\n        result=audit({"documents":[{"document_id":"S100YGXD","candidates":[a,b]}]})\n        self.assertIn("NetAssets",result["documents"][0]["conflicting_duplicate_concepts"])\n        self.assertEqual(result["approved_rows"],0)\n\n    def test_nonstandard_context_not_accepted(self):
         rows=[fact("NetAssets","Prior1YearInstant")]
         result=audit({"documents":[{"document_id":"S100YGXD","candidates":rows}]})
         self.assertIn("NetAssets",result["documents"][0]["missing_required"])
