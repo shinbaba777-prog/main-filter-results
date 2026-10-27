@@ -1,0 +1,19 @@
+name: Audit scoring spec behavior (no production change)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - tests/test_4406_scoring_spec_audit.py
+      - .github/workflows/4406-scoring-spec-audit.yml
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test current rubric behavior without changes
+        run: python3 -m unittest discover -s tests -p 'test_4406_scoring_spec_audit.py' -v
