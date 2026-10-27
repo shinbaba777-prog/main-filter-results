@@ -1,0 +1,23 @@
+name: EDINET context conflict diagnostics
+
+on:
+  pull_request:
+    paths:
+      - "scripts/diagnose_edinet_context_conflicts.py"
+      - "tests/test_diagnose_edinet_context_conflicts.py"
+      - ".github/workflows/edinet-context-conflicts-pr-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test context suffix partitioning
+        run: python3 -m unittest discover -s tests -p 'test_diagnose_edinet_context_conflicts.py' -v
+      - name: Diagnose actual 4406 data read-only
+        run: python3 scripts/diagnose_edinet_context_conflicts.py

@@ -1,0 +1,32 @@
+name: Original XBRL evidence gate
+
+on:
+  pull_request:
+    paths:
+      - "scripts/check_original_xbrl_contexts.py"
+      - "tests/test_check_original_xbrl_contexts.py"
+      - ".github/workflows/edinet-original-xbrl-pr-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run original-XBRL context parser tests
+        run: python3 -m unittest discover -s tests -p 'test_check_original_xbrl_contexts.py' -v
+      - name: Confirm missing evidence blocks approval
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/check_original_xbrl_contexts.py
+          code=$?
+          set -e
+          if [ "$code" -ne 2 ]; then
+            echo "Expected blocked result (exit 2), got $code"
+            exit 1
+          fi

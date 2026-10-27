@@ -1,0 +1,32 @@
+name: EDINET actual XBRL period diagnostics
+
+on:
+  pull_request:
+    paths:
+      - "scripts/verify_edinet_actual_periods.py"
+      - "tests/test_verify_edinet_actual_periods.py"
+      - ".github/workflows/edinet-actual-period-pr-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test actual XBRL period validation
+        run: python3 -m unittest discover -s tests -p 'test_verify_edinet_actual_periods.py' -v
+      - name: Verify absent evidence is rejected
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/verify_edinet_actual_periods.py --evidence-dir "$RUNNER_TEMP/nonexistent-edinet-contexts"
+          code=$?
+          set -e
+          if [ "$code" -ne 2 ]; then
+            echo "Expected missing-evidence exit code 2, got $code"
+            exit 1
+          fi

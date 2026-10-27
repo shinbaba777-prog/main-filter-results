@@ -1,0 +1,23 @@
+name: EDINET cross-filing checks
+
+on:
+  pull_request:
+    paths:
+      - "scripts/check_edinet_cross_filing.py"
+      - "tests/test_check_edinet_cross_filing.py"
+      - ".github/workflows/edinet-cross-filing-pr-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run cross-filing tests
+        run: python3 -m unittest discover -s tests -p 'test_check_edinet_cross_filing.py' -v
+      - name: Inspect historical overlap without editing files
+        run: python3 scripts/check_edinet_cross_filing.py
