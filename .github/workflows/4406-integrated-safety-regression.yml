@@ -1,0 +1,47 @@
+name: 4406 integrated safety regression (review only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  safety-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/source-provenance-report-20261028
+      - name: Run all five isolated safety test suites
+        run: |
+          python3 -m unittest discover -s tests -p 'test_verify_4406_primary_sources.py' -v
+          python3 -m unittest discover -s tests -p 'test_4406_scoring_bridge.py' -v
+          python3 -m unittest discover -s tests -p 'test_review_4406_cf_sensitivity.py' -v
+          python3 -m unittest discover -s tests -p 'test_build_4406_evidence_inventory.py' -v
+          python3 -m unittest discover -s tests -p 'test_4406_scoring_spec_audit.py' -v
+      - name: Check 45 source metrics against official-PDF reference
+        run: python3 scripts/verify_4406_primary_sources.py
+      - name: Build review-only evidence
+        run: python3 scripts/build_4406_evidence_inventory.py
+      - name: Run review-only scoring bridge
+        run: python3 scripts/bridge_4406_review_to_scoring.py
+      - name: Review FCF sensitivity
+        run: python3 scripts/review_4406_cf_sensitivity.py
+      - name: Assert fail-closed scoring output
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('artifacts/4406_scoring_bridge_dry_run.json').read_text())
+          assert p.get('publish_to_index') is False, p
+          assert p.get('scoring_eligible') is False or p.get('scoring_eligible') is None, p
+          print('PASS: no index publication')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 4406-integrated-review-artifacts
+          path: |
+            artifacts/4406_primary_source_gate.json
+            artifacts/4406_evidence_inventory.json
+            artifacts/4406_scoring_bridge_dry_run.json
+            artifacts/4406_cf_sensitivity_review.json
+          retention-days: 14
