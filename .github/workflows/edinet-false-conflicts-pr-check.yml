@@ -1,0 +1,23 @@
+name: EDINET false conflict regression
+
+on:
+  pull_request:
+    paths:
+      - "scripts/audit_edinet_false_conflicts.py"
+      - "tests/test_audit_edinet_false_conflicts.py"
+      - ".github/workflows/edinet-false-conflicts-pr-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify member-aware comparison regression
+        run: python3 -m unittest discover -s tests -p 'test_audit_edinet_false_conflicts.py' -v
+      - name: Record read-only diagnostic
+        run: python3 scripts/audit_edinet_false_conflicts.py
