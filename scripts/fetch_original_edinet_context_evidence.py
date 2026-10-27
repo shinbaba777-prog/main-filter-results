@@ -9,6 +9,8 @@ import io
 import json
 import os
 import re
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -46,6 +48,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--check-audit", action="store_true", help="Run the read-only 680-row context evidence gate after retrieval")
     args = parser.parse_args()
     key = os.environ.get("EDINET_API_KEY", "").strip()
     if not key:
@@ -75,7 +78,13 @@ def main():
             reports.append({"docID": doc_id, "status": "BLOCKED", "error_type": type(exc).__name__})
     print(json.dumps({"status": "REVIEW_REQUIRED", "scoring_ready": False,
                       "filings": reports}, ensure_ascii=False, indent=2))
-    return 0 if reports and all(x["status"] == "CONTEXTS_FOUND" for x in reports) else 2
+    fetch_complete = bool(reports and all(x["status"] == "CONTEXTS_FOUND" for x in reports))
+    if args.check_audit:
+        command = [sys.executable, str(Path(__file__).with_name("check_original_xbrl_contexts.py")),
+                   "--root", str(args.root), "--evidence-dir", str(args.output_dir)]
+        check = subprocess.run(command, check=False)
+        return 0 if fetch_complete and check.returncode == 0 else 2
+    return 0 if fetch_complete else 2
 
 if __name__ == "__main__":
     raise SystemExit(main())
