@@ -9,6 +9,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Test XBRL context extraction offline
+        run: python3 -m unittest discover -s tests -p 'test_fetch_4406_original_xbrl_contexts.py' -v
       - name: Inspect EDINET original XBRL contexts
         env:
           EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
