@@ -39,7 +39,7 @@ def inspect(review, zip_dir=ZIP_DIR):
                     data=raw.decode("utf-16-le") if raw.count(b"\x00")>len(raw)//5 else raw.decode("cp932")
             # Raw source row number may refer to a CSV physical line. Preserve it
             # as provenance, rather than assuming its offset is a parsed CSV index.
-            header=next(csv.reader(io.StringIO(data)))
+            header=next(csv.reader(io.StringIO(data), delimiter="\\t" if "\\t" in data.splitlines()[0] else ","))
             context_files=[n for n in names if n.lower().endswith((".xbrl",".xml")) and
                            ("context" in n.lower() or "instance" in n.lower())]
             findings.append({"document_id":doc,"source_zip":archive.name,
