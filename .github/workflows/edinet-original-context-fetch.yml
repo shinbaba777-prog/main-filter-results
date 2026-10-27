@@ -1,0 +1,42 @@
+name: EDINET original XBRL context evidence
+
+on:
+  pull_request:
+    paths:
+      - "scripts/fetch_original_edinet_context_evidence.py"
+      - "tests/test_fetch_original_edinet_context_evidence.py"
+      - ".github/workflows/edinet-original-context-fetch.yml"
+  workflow_dispatch:
+    inputs:
+      fetch_originals:
+        description: "Fetch original EDINET XBRL contexts (requires EDINET_API_KEY secret)"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install requests
+        run: python3 -m pip install --disable-pip-version-check requests
+      - name: Test original XBRL archive parsing
+        run: python3 -m unittest discover -s tests -p 'test_fetch_original_edinet_context_evidence.py' -v
+      - name: Fetch original XBRL evidence only when explicitly requested
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.fetch_originals }}
+        env:
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+        run: python3 scripts/fetch_original_edinet_context_evidence.py --output-dir "$RUNNER_TEMP/edinet-context-evidence"
+      - name: Upload evidence for manual review (no repository commit)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.fetch_originals }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-xbrl-contexts-${{ github.run_id }}
+          path: ${{ runner.temp }}/edinet-context-evidence/*.contexts.json
+          if-no-files-found: warn
+          retention-days: 7
