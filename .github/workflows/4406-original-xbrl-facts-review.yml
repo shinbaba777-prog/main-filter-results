@@ -5,6 +5,9 @@ on:
       - feature/source-provenance-report-20261028
     paths:
       - .github/workflows/4406-original-xbrl-facts-review.yml
+      - scripts/inspect_4406_original_xbrl_facts.py
+      - scripts/run_4406_original_xbrl_facts_review.py
+      - tests/test_inspect_4406_original_xbrl_facts.py
   workflow_dispatch:
 permissions:
   contents: read
