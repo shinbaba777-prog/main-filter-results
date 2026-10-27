@@ -4,6 +4,8 @@ import csv
 import json
 from pathlib import Path
 
+from scripts.verify_4406_primary_sources import verify, AUDIT
+
 SOURCE = Path("data/edinet/verified/4406_five_year_financials.csv")
 OUT = Path("artifacts/4406_evidence_inventory.json")
 METRICS = ("sales_million_yen", "operating_profit_million_yen",
@@ -14,7 +16,10 @@ UNVERIFIED = ("roic_pct", "wacc_pct", "ebitda_verified_million_yen",
               "net_debt_verified_million_yen", "short_interest_direction",
               "industry_per_jpx", "ir_event_alpha")
 
-def build(rows):
+def build(rows, audit):
+    gate = verify(rows, audit)
+    if gate['issues'] or gate['matched_metrics'] != 45 or len(rows) != 5:
+        raise ValueError('Primary-source gate failed: ' + '; '.join(gate['issues']))
     entries = []
     for row in rows:
         for key in METRICS:
@@ -38,10 +43,9 @@ def build(rows):
 def main():
     with SOURCE.open(newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
-    if len(rows) != 5 or any(not row.get("document_id") for row in rows):
-        raise SystemExit("Five verified EDINET documents required")
+    audit = json.loads(AUDIT.read_text(encoding="utf-8"))
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(build(rows), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    OUT.write_text(json.dumps(build(rows, audit), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"Saved {OUT}; entries={len(rows) * len(METRICS)}; scoring_eligible=false")
 
 if __name__ == "__main__":
