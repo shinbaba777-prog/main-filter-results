@@ -1,0 +1,32 @@
+name: 4406 FY2021 and ROIC source inventory (review only)
+on:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - .github/workflows/4406-fy2021-roic-source-inventory.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect existing EDINET files only
+        run: |
+          python3 scripts/inventory_4406_fy2021_roic_sources.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path("artifacts/4406_fy2021_roic_source_inventory.json").read_text())
+          assert p["approved_rows"]==0 and p["scoring_eligible"] is False
+          assert p["publish_to_index"] is False
+          print("PASS: inventory only; no scoring or publication")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 4406-fy2021-roic-source-inventory
+          path: artifacts/4406_fy2021_roic_source_inventory.json
+          retention-days: 14
