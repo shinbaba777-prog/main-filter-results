@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Unit tests: ROIC scope audit must never approve or conflate individual facts."""
 import unittest
+# Regression checks run against the latest audited scope gate.
 from scripts.audit_4406_roic_scope_gate import audit, REQUIRED
 
 def fact(concept, context, member=None):
