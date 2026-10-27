@@ -16,7 +16,8 @@ def audit(data):
     for doc in data["documents"]:
         rows = doc["candidates"]
         current = {}
-        individual_lease = []\n        conflicts = []
+        individual_lease = []
+        conflicts = []
         for row in rows:
             context = row.get("context", {})
             dims = context.get("dimensions", [])
@@ -31,7 +32,9 @@ def audit(data):
             expected = "CurrentYearDuration" if row["concept"] in REQUIRED[:3] else "CurrentYearInstant"
             if row["context_id"] != expected:
                 continue
-            if row["concept"] in current and (row.get("value"), row.get("unit_ref")) != (current[row["concept"]].get("value"), current[row["concept"]].get("unit_ref")):\n                conflicts.append(row["concept"])\n            current[row["concept"]] = row
+            if row["concept"] in current and (row.get("value"), row.get("unit_ref")) != (current[row["concept"]].get("value"), current[row["concept"]].get("unit_ref")):
+                conflicts.append(row["concept"])
+            current[row["concept"]] = row
         missing = sorted(set(REQUIRED) - set(current))
         results.append({"document_id": doc["document_id"], "matched_required": sorted(current),
                         "missing_required": missing, "conflicting_duplicate_concepts": sorted(set(conflicts)),
@@ -49,7 +52,8 @@ def main():
     args = parser.parse_args()
     result = audit(json.loads(args.inventory.read_text(encoding="utf-8")))
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
+    args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2)+"
+", encoding="utf-8")
     for row in result["documents"]:
         print(row["document_id"], "required", len(row["matched_required"]), "/", len(REQUIRED),
               "unresolved", len(row["unresolved_balances"]))
