@@ -24,6 +24,7 @@ def inspect_original_zip(payload,doc_id):
         raise ValueError("Original filing response is not ZIP")
     facts=[]
     linkbases=[]
+    linkbase_evidence=[]
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         for entry in archive.infolist():
             name=entry.filename
@@ -31,6 +32,19 @@ def inspect_original_zip(payload,doc_id):
             if name.lower().endswith((".xml",".xsd")) and "publicdoc" in name.lower():
                 if any(part in name.lower() for part in ("_pre","_def","presentation","definition")):
                     linkbases.append(name)
+                    root_link=ET.fromstring(archive.read(entry))
+                    xlink="{http://www.w3.org/1999/xlink}"
+                    for network in root_link:
+                        role=network.get(xlink+"role","")
+                        locs={x.get(xlink+"label",""):x.get(xlink+"href","") for x in network if x.tag.endswith("}loc")}
+                        for arc in network:
+                            if not arc.tag.endswith(("presentationArc","definitionArc")):continue
+                            source=locs.get(arc.get(xlink+"from",""),"")
+                            target=locs.get(arc.get(xlink+"to",""),"")
+                            if source and target and (any(c in source or c in target for c in CONCEPTS) or
+                                any(t in (source+" "+target+" "+role).lower() for t in ("consolidated","nonconsolidated","summaryofbusinessresults"))):
+                                linkbase_evidence.append({"file":name,"role":role,"from":source,"to":target,
+                                    "arcrole":arc.get(xlink+"arcrole",""),"order":arc.get("order","")})
             if not (name.lower().endswith(".xbrl") and "publicdoc" in name.lower()):
                 continue
             root=ET.fromstring(archive.read(entry))
@@ -51,6 +65,7 @@ def inspect_original_zip(payload,doc_id):
     if not facts:raise ValueError("No relevant original XBRL facts")
     return {"document_id":doc_id,"facts":facts,"linkbase_candidates":linkbases,
         "current_year_facts":sum(x["context_id"]=="CurrentYearDuration" for x in facts),
+        "linkbase_evidence":linkbase_evidence,
         "status":"REVIEW_REQUIRED","scoring_eligible":False,"approved_rows":0}
 
 def save_inventory(documents,path):
