@@ -36,7 +36,7 @@ def fetch(url):
 
 def parse_value(text, label):
     # Only label-bound values are eligible. Fail closed on layout changes.
-    pattern = re.escape(label) + r"\\s*(?:用語\\s*)?[:：]?\\s*([0-9,]+(?:\\.[0-9]+)?)"
+    pattern = re.escape(label) + r"\s*(?:用語\s*)?[:：]?\s*([0-9,]+(?:\.[0-9]+)?)"
     match = re.search(pattern, text)
     return match.group(1) if match else None
 
