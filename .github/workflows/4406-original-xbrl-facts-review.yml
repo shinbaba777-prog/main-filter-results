@@ -1,0 +1,30 @@
+name: 4406 original XBRL fact evidence (review only)
+on:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - .github/workflows/4406-original-xbrl-facts-review.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  facts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original XBRL parser offline
+        run: python3 -m unittest discover -s tests -p 'test_inspect_4406_original_xbrl_facts.py' -v
+      - name: Fetch original filings and inspect facts
+        env:
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+        run: python3 -m scripts.run_4406_original_xbrl_facts_review
+      - name: Upload review-only evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4406-original-xbrl-fact-evidence
+          path: artifacts/4406_original_xbrl_facts_linkbases.json
+          if-no-files-found: warn
+          retention-days: 7
