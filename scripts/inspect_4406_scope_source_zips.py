@@ -27,7 +27,16 @@ def inspect(review, zip_dir=ZIP_DIR):
             names=z.namelist()
             if source not in names:
                 raise ValueError(f"Missing source CSV {source} in {archive.name}")
-            data=z.read(source).decode("utf-8-sig")
+            raw=z.read(source)
+            if raw.startswith((b"\\xff\\xfe",b"\\xfe\\xff")):
+                data=raw.decode("utf-16")
+            elif raw.startswith(b"\\xef\\xbb\\xbf"):
+                data=raw.decode("utf-8-sig")
+            else:
+                try:
+                    data=raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    data=raw.decode("cp932")
             # Raw source row number may refer to a CSV physical line. Preserve it
             # as provenance, rather than assuming its offset is a parsed CSV index.
             header=next(csv.reader(io.StringIO(data)))
