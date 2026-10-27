@@ -1,0 +1,20 @@
+name: 4406 ROIC scope gate regression (no publish)
+on:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - scripts/audit_4406_roic_scope_gate.py
+      - tests/test_4406_roic_scope_gate.py
+      - .github/workflows/4406-roic-scope-gate-tests.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test fail-closed ROIC source gate
+        run: python3 -m unittest discover -s tests -p test_4406_roic_scope_gate.py -v
