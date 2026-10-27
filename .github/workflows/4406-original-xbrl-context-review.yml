@@ -1,0 +1,20 @@
+name: 4406 original XBRL context inventory (manual review only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-xbrl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect EDINET original XBRL contexts
+        env:
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+        run: python3 scripts/fetch_4406_original_xbrl_contexts.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 4406-original-xbrl-context-inventory
+          path: artifacts/4406_original_xbrl_context_inventory.json
+          retention-days: 7
