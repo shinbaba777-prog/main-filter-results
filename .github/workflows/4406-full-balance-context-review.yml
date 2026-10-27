@@ -1,0 +1,21 @@
+name: 4406 full original XBRL balance context review (no publish)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch full core balance-sheet context inventory
+        env:
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+        run: python3 -m scripts.run_4406_full_balance_context
+      - name: Upload review-only original evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4406-full-balance-context-review
+          path: artifacts/4406_full_balance_context_inventory.json
+          retention-days: 7
