@@ -22,6 +22,8 @@ on:
       - tests/test_inspect_4406_scope_source_zips.py
       - scripts/fetch_4406_original_xbrl_contexts.py
       - tests/test_fetch_4406_original_xbrl_contexts.py
+      - scripts/inspect_4406_original_xbrl_facts.py
+      - tests/test_inspect_4406_original_xbrl_facts.py
 permissions:
   contents: read
 jobs:
@@ -32,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: feature/source-provenance-report-20261028
-      - name: Run all twelve isolated safety test suites
+      - name: Run all thirteen isolated safety test suites
         run: |
           python3 -m unittest discover -s tests -p 'test_verify_4406_primary_sources.py' -v
           python3 -m unittest discover -s tests -p 'test_4406_scoring_bridge.py' -v
@@ -46,6 +48,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_review_4406_consolidation_scope.py' -v
           python3 -m unittest discover -s tests -p 'test_inspect_4406_scope_source_zips.py' -v
           python3 -m unittest discover -s tests -p 'test_fetch_4406_original_xbrl_contexts.py' -v
+          python3 -m unittest discover -s tests -p 'test_inspect_4406_original_xbrl_facts.py' -v
       - name: Check 45 source metrics against official-PDF reference
         run: python3 scripts/verify_4406_primary_sources.py
       - name: Build review-only evidence
