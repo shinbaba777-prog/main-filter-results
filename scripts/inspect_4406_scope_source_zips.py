@@ -36,7 +36,7 @@ def inspect(review, zip_dir=ZIP_DIR):
                 try:
                     data=raw.decode("utf-8")
                 except UnicodeDecodeError:
-                    data=raw.decode("cp932")
+                    data=raw.decode("utf-16-le") if raw.count(b"\\x00")>len(raw)//5 else raw.decode("cp932")
             # Raw source row number may refer to a CSV physical line. Preserve it
             # as provenance, rather than assuming its offset is a parsed CSV index.
             header=next(csv.reader(io.StringIO(data)))
