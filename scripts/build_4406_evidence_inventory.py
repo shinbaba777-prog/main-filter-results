@@ -4,7 +4,12 @@ import csv
 import json
 from pathlib import Path
 
-from scripts.verify_4406_primary_sources import verify, AUDIT
+try:
+    from scripts.verify_4406_primary_sources import verify, AUDIT
+except ModuleNotFoundError as exc:
+    if exc.name != 'scripts':
+        raise
+    from verify_4406_primary_sources import verify, AUDIT
 
 SOURCE = Path("data/edinet/verified/4406_five_year_financials.csv")
 OUT = Path("artifacts/4406_evidence_inventory.json")
