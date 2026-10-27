@@ -27,14 +27,14 @@ class ZipSourceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             folder=Path(tmp);f=fixture(folder)
             with zipfile.ZipFile(folder/"44060_DOC0_xbrl_csv.zip","w") as z:
-                z.writestr("source.csv","要素ID\\t項目名\\tコンテキストID\\nexample\\t売上高\\tCurrentYearDuration\\n".encode("utf-16"))
+                z.writestr("source.csv","要素ID\t項目名\tコンテキストID\nexample\t売上高\tCurrentYearDuration\n".encode("utf-16"))
             out=inspect(f,folder)
             self.assertEqual(out["rows"][0]["source_csv_columns"],["要素ID","項目名","コンテキストID"])
     def test_utf16_source_csv(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder=Path(tmp);f=fixture(folder)
             with zipfile.ZipFile(folder/"44060_DOC0_xbrl_csv.zip","w") as z:
-                z.writestr("source.csv","element_id,context_id,value\\nexample,CurrentYearDuration,1\\n".encode("utf-16"))
+                z.writestr("source.csv","element_id,context_id,value\nexample,CurrentYearDuration,1\n".encode("utf-16"))
             self.assertEqual(inspect(f,folder)["source_csv_files_verified"],35)
     def test_missing_source_file_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
