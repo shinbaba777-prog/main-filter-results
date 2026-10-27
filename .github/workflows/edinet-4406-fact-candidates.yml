@@ -1,0 +1,31 @@
+name: EDINET 4406 XBRL fact candidates review
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_fetch:
+        description: "Fetch five original XBRL filings for review only"
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  extract:
+    if: ${{ inputs.confirm_fetch }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract unapproved financial fact candidates
+        env:
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+          OUTPUT_DIR: ${{ runner.temp }}/4406-facts
+        run: python3 scripts/extract_4406_xbrl_fact_candidates.py
+      - name: Upload review evidence even on failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: edinet-4406-fact-candidates-${{ github.run_id }}
+          path: ${{ runner.temp }}/4406-facts/
+          retention-days: 7
+          if-no-files-found: warn
