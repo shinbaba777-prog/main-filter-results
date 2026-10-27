@@ -23,6 +23,12 @@ class ZipSourceTests(unittest.TestCase):
             self.assertEqual(r["source_csv_files_verified"],35)
             self.assertEqual(r["approved_rows"],0)
             self.assertFalse(r["scoring_eligible"])
+    def test_utf16_source_csv(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp);f=fixture(folder)
+            with zipfile.ZipFile(folder/"44060_DOC0_xbrl_csv.zip","w") as z:
+                z.writestr("source.csv","element_id,context_id,value\\nexample,CurrentYearDuration,1\\n".encode("utf-16"))
+            self.assertEqual(inspect(f,folder)["source_csv_files_verified"],35)
     def test_missing_source_file_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             f=fixture(Path(tmp));f["unresolved_rows"][0]["source_csv"]="missing.csv"
