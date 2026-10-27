@@ -25,6 +25,10 @@ def build(rows, audit):
     gate = verify(rows, audit)
     if gate['issues'] or gate['matched_metrics'] != 45 or len(rows) != 5:
         raise ValueError('Primary-source gate failed: ' + '; '.join(gate['issues']))
+    if any(not row.get('document_id', '').strip() or not row.get('source_file', '').strip() for row in rows):
+        raise ValueError('Missing EDINET document ID or source ZIP provenance')
+    if len({row['document_id'] for row in rows}) != 5:
+        raise ValueError('Duplicate EDINET document IDs in five-year inventory')
     entries = []
     for row in rows:
         for key in METRICS:
