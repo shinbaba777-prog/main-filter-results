@@ -1,6 +1,9 @@
 import unittest
 
-from scripts.verify_scoring_inputs import validate
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+from verify_scoring_inputs import validate
 
 class ScoringInputGateTests(unittest.TestCase):
     def test_missing_payload_is_blocked(self):
