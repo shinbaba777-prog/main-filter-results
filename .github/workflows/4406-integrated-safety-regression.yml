@@ -6,6 +6,12 @@ on:
       - feature/source-provenance-report-20261028
     paths:
       - .github/workflows/4406-integrated-safety-regression.yml
+      - scripts/build_4406_evidence_inventory.py
+      - tests/test_build_4406_evidence_inventory.py
+      - scripts/build_4406_xbrl_review_queue.py
+      - tests/test_4406_xbrl_review_queue.py
+      - scripts/prioritize_4406_xbrl_review.py
+      - tests/test_prioritize_4406_xbrl_review.py
 permissions:
   contents: read
 jobs:
@@ -16,13 +22,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: feature/source-provenance-report-20261028
-      - name: Run all five isolated safety test suites
+      - name: Run all seven isolated safety test suites
         run: |
           python3 -m unittest discover -s tests -p 'test_verify_4406_primary_sources.py' -v
           python3 -m unittest discover -s tests -p 'test_4406_scoring_bridge.py' -v
           python3 -m unittest discover -s tests -p 'test_review_4406_cf_sensitivity.py' -v
           python3 -m unittest discover -s tests -p 'test_build_4406_evidence_inventory.py' -v
           python3 -m unittest discover -s tests -p 'test_4406_scoring_spec_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_4406_xbrl_review_queue.py' -v
+          python3 -m unittest discover -s tests -p 'test_prioritize_4406_xbrl_review.py' -v
       - name: Check 45 source metrics against official-PDF reference
         run: python3 scripts/verify_4406_primary_sources.py
       - name: Build review-only evidence
@@ -31,6 +39,10 @@ jobs:
         run: python3 -m scripts.bridge_4406_review_to_scoring
       - name: Review FCF sensitivity
         run: python3 scripts/review_4406_cf_sensitivity.py
+      - name: Validate 680-row XBRL review queue
+        run: python3 scripts/build_4406_xbrl_review_queue.py
+      - name: Prioritize XBRL review by filing and metric
+        run: python3 scripts/prioritize_4406_xbrl_review.py
       - name: Assert fail-closed scoring output
         run: |
           python3 - <<'PY'
@@ -50,4 +62,6 @@ jobs:
             artifacts/4406_evidence_inventory.json
             artifacts/4406_scoring_bridge_dry_run.json
             artifacts/4406_cf_sensitivity_review.json
+            artifacts/4406_xbrl_review_queue.json
+            artifacts/4406_xbrl_priority_review.json
           retention-days: 14
