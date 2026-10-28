@@ -1,0 +1,28 @@
+name: 4406 evidence inventory (review only)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - scripts/build_4406_evidence_inventory.py
+      - scripts/verify_4406_primary_sources.py
+      - .github/workflows/4406-evidence-inventory.yml
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check source reconciliation first
+        run: python3 scripts/verify_4406_primary_sources.py
+      - name: Build provenance inventory without scoring
+        run: python3 scripts/build_4406_evidence_inventory.py
+      - name: Upload evidence inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4406-evidence-inventory
+          path: artifacts/4406_evidence_inventory.json
+          retention-days: 14

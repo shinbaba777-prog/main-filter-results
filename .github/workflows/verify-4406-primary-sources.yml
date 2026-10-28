@@ -1,0 +1,29 @@
+name: Verify 4406 primary-source figures (review only)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - scripts/verify_4406_primary_sources.py
+      - data/edinet/verified/4406_five_year_financials.csv
+      - data/edinet/extracted/financial_metric_audit_summary.json
+      - .github/workflows/verify-4406-primary-sources.yml
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate official-PDF reconciled figures against EDINET verified CSV
+        run: python3 scripts/verify_4406_primary_sources.py
+      - name: Upload verification artifact even if validation fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: primary-source-verification-4406
+          path: artifacts/4406_primary_source_gate.json
+          if-no-files-found: warn
+          retention-days: 14

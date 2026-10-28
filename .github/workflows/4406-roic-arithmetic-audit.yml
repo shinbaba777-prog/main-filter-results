@@ -1,0 +1,28 @@
+name: 4406 ROIC arithmetic audit (no publish)
+on:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - .github/workflows/4406-roic-arithmetic-audit.yml
+      - tests/test_4406_roic_arithmetic_review.py
+      - scripts/audit_4406_roic_arithmetic_review.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ROIC safety regression tests
+        run: python3 -m unittest discover -s tests -p 'test_4406_roic_arithmetic_review.py' -v
+      - name: Audit arithmetic with explicit fail-closed gates
+        run: python3 -m scripts.audit_4406_roic_arithmetic_review
+      - name: Upload review-only arithmetic
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4406-roic-arithmetic-review
+          path: artifacts/4406_roic_arithmetic_audit.json
+          retention-days: 7

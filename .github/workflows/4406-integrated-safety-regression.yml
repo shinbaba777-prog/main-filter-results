@@ -1,0 +1,115 @@
+name: 4406 integrated safety regression (review only)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - .github/workflows/4406-integrated-safety-regression.yml
+      - scripts/build_4406_evidence_inventory.py
+      - tests/test_build_4406_evidence_inventory.py
+      - scripts/build_4406_xbrl_review_queue.py
+      - tests/test_4406_xbrl_review_queue.py
+      - scripts/prioritize_4406_xbrl_review.py
+      - tests/test_prioritize_4406_xbrl_review.py
+      - scripts/reconcile_4406_xbrl_current_year.py
+      - tests/test_reconcile_4406_xbrl_current_year.py
+      - scripts/review_4406_roe_units.py
+      - tests/test_review_4406_roe_units.py
+      - scripts/review_4406_consolidation_scope.py
+      - tests/test_review_4406_consolidation_scope.py
+      - scripts/inspect_4406_scope_source_zips.py
+      - tests/test_inspect_4406_scope_source_zips.py
+      - scripts/fetch_4406_original_xbrl_contexts.py
+      - tests/test_fetch_4406_original_xbrl_contexts.py
+      - scripts/inspect_4406_original_xbrl_facts.py
+      - tests/test_inspect_4406_original_xbrl_facts.py
+      - scripts/audit_4406_scoring_input_readiness.py
+      - tests/test_audit_4406_scoring_input_readiness.py
+permissions:
+  contents: read
+jobs:
+  safety-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/source-provenance-report-20261028
+      - name: Run all fourteen isolated safety test suites
+        run: |
+          python3 -m unittest discover -s tests -p 'test_verify_4406_primary_sources.py' -v
+          python3 -m unittest discover -s tests -p 'test_4406_scoring_bridge.py' -v
+          python3 -m unittest discover -s tests -p 'test_review_4406_cf_sensitivity.py' -v
+          python3 -m unittest discover -s tests -p 'test_build_4406_evidence_inventory.py' -v
+          python3 -m unittest discover -s tests -p 'test_4406_scoring_spec_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_4406_xbrl_review_queue.py' -v
+          python3 -m unittest discover -s tests -p 'test_prioritize_4406_xbrl_review.py' -v
+          python3 -m unittest discover -s tests -p 'test_reconcile_4406_xbrl_current_year.py' -v
+          python3 -m unittest discover -s tests -p 'test_review_4406_roe_units.py' -v
+          python3 -m unittest discover -s tests -p 'test_review_4406_consolidation_scope.py' -v
+          python3 -m unittest discover -s tests -p 'test_inspect_4406_scope_source_zips.py' -v
+          python3 -m unittest discover -s tests -p 'test_fetch_4406_original_xbrl_contexts.py' -v
+          python3 -m unittest discover -s tests -p 'test_inspect_4406_original_xbrl_facts.py' -v
+          python3 -m unittest discover -s tests -p 'test_audit_4406_scoring_input_readiness.py' -v
+      - name: Check 45 source metrics against official-PDF reference
+        run: python3 scripts/verify_4406_primary_sources.py
+      - name: Build review-only evidence
+        run: python3 scripts/build_4406_evidence_inventory.py
+      - name: Run review-only scoring bridge
+        run: python3 -m scripts.bridge_4406_review_to_scoring
+      - name: Review FCF sensitivity
+        run: python3 scripts/review_4406_cf_sensitivity.py
+      - name: Validate 680-row XBRL review queue
+        run: python3 scripts/build_4406_xbrl_review_queue.py
+      - name: Prioritize XBRL review by filing and metric
+        run: python3 scripts/prioritize_4406_xbrl_review.py
+      - name: Reconcile current-year XBRL concepts against official figures
+        run: python3 scripts/reconcile_4406_xbrl_current_year.py
+      - name: Verify ROE pure unit conversion without approval
+        run: python3 scripts/review_4406_roe_units.py
+      - name: Inspect unresolved scope source ZIP evidence
+        run: |
+          python3 scripts/review_4406_consolidation_scope.py
+          python3 scripts/inspect_4406_scope_source_zips.py
+      - name: Audit five-year scoring input readiness without promotion
+        run: python3 scripts/audit_4406_scoring_input_readiness.py
+      - name: Assert fail-closed scoring output
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('artifacts/4406_scoring_bridge_dry_run.json').read_text())
+          assert p.get('publish_to_index') is False, p
+          assert p.get('source_approved') is False, p
+          assert p['engine_result']['total']['adjusted_score'] is None, p
+          x=json.loads(Path('artifacts/4406_xbrl_current_year_matches.json').read_text())
+          assert x['numeric_matches'] == 65, x
+          assert x['numeric_mismatches'] == 0, x
+          assert x['different_profit_concepts_not_comparable'] == 25, x
+          assert x['approved_rows'] == 0 and x['scoring_eligible'] is False, x
+          roe=json.loads(Path('artifacts/4406_roe_unit_review.json').read_text())
+          assert roe['numeric_matches'] == 5 and roe['numeric_mismatches'] == 0, roe
+          assert roe['approved_rows'] == 0 and roe['scoring_eligible'] is False, roe
+          scope=json.loads(Path('artifacts/4406_consolidation_scope_review.json').read_text())
+          zip_evidence=json.loads(Path('artifacts/4406_scope_source_zip_evidence.json').read_text())
+          assert scope['unresolved_scope_count'] == 35 and scope['approved_rows'] == 0, scope
+          assert zip_evidence['source_csv_files_verified'] == 35 and zip_evidence['approved_rows'] == 0, zip_evidence
+          print('PASS: no index publication; 65 XBRL matches, 5 ROE ratios, 35 source ZIP paths')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 4406-integrated-review-artifacts
+          path: |
+            artifacts/4406_primary_source_gate.json
+            artifacts/4406_evidence_inventory.json
+            artifacts/4406_scoring_bridge_dry_run.json
+            artifacts/4406_cf_sensitivity_review.json
+            artifacts/4406_xbrl_review_queue.json
+            artifacts/4406_xbrl_priority_review.json
+            artifacts/4406_xbrl_current_year_matches.json
+            artifacts/4406_roe_unit_review.json
+            artifacts/4406_consolidation_scope_review.json
+            artifacts/4406_scope_source_zip_evidence.json
+            artifacts/4406_scoring_input_readiness.json
+          retention-days: 14

@@ -1,0 +1,28 @@
+name: 4406 FY2021 comparative original review (no publish)
+on:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - .github/workflows/4406-fy2021-comparative-review.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract original FY2021 comparative facts
+        env:
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+        run: python3 -m scripts.run_4406_fy2021_comparative_review
+      - name: Upload review-only original facts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4406-fy2021-comparative-review
+          path: artifacts/4406_fy2021_comparative_review.json
+          retention-days: 7
+          if-no-files-found: warn

@@ -1,0 +1,28 @@
+name: 4406 original XBRL ROIC input review (no publish)
+on:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - .github/workflows/4406-roic-original-xbrl-review.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract ROIC source candidates from official original filings
+        env:
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+        run: python3 -m scripts.run_4406_roic_original_xbrl_review
+      - name: Upload evidence (review only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4406-original-xbrl-roic-input-candidates
+          path: artifacts/4406_roic_original_xbrl_candidates.json
+          if-no-files-found: warn
+          retention-days: 14
