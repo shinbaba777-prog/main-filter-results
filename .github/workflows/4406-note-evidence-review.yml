@@ -1,0 +1,28 @@
+name: 4406 original XBRL note evidence review (no publish)
+on:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - .github/workflows/4406-note-evidence-review.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect original XBRL notes and extension labels
+        env:
+          EDINET_API_KEY: ${{ secrets.EDINET_API_KEY }}
+        run: python3 -m scripts.run_4406_xbrl_note_evidence
+      - name: Upload review-only evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4406-original-xbrl-note-evidence
+          path: artifacts/4406_original_xbrl_note_evidence.json
+          if-no-files-found: warn
+          retention-days: 7
