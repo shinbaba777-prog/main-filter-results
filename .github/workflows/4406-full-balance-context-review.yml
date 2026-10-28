@@ -1,5 +1,10 @@
 name: 4406 full original XBRL balance context review (no publish)
 on:
+  push:
+    branches:
+      - feature/source-provenance-report-20261028
+    paths:
+      - .github/workflows/4406-full-balance-context-review.yml
   workflow_dispatch:
 permissions:
   contents: read
