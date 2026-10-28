@@ -5,6 +5,8 @@ on:
       - feature/source-provenance-report-20261028
     paths:
       - .github/workflows/4406-roic-arithmetic-audit.yml
+      - tests/test_4406_roic_arithmetic_review.py
+      - scripts/audit_4406_roic_arithmetic_review.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,6 +16,8 @@ jobs:
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
+      - name: Run ROIC safety regression tests
+        run: python3 -m unittest discover -s tests -p 'test_4406_roic_arithmetic_review.py' -v
       - name: Audit arithmetic with explicit fail-closed gates
         run: python3 -m scripts.audit_4406_roic_arithmetic_review
       - name: Upload review-only arithmetic
