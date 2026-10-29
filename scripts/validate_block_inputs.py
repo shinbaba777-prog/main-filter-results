@@ -7,7 +7,7 @@ cannot silently pass while the Base scenario remains unassessed.
 """
 from __future__ import annotations
 
-BOOLEAN_KEYS = (
+STRICT_BOOLEAN_KEYS = (
     "shorts_direction_zero",
     "shorts_applicable",
     "ocf_ni_zero",
@@ -15,24 +15,32 @@ BOOLEAN_KEYS = (
     "roic_below_h",
     "roic_unavailable",
     "short_type_a",
-    "peg_over_2",
-    "industry_per_over_130",
 )
+TRISTATE_BOOLEAN_KEYS = ("peg_over_2", "industry_per_over_130")
 
 def validate_buy_block_inputs(inputs: object) -> list[str]:
     errors: list[str] = []
     if not isinstance(inputs, dict):
         return ["buy_block_inputs must be a JSON object"]
-    for key in BOOLEAN_KEYS:
+    for key in STRICT_BOOLEAN_KEYS:
         if key not in inputs:
             errors.append(f"buy_block_inputs.{key} is absent; verify explicitly")
         elif not isinstance(inputs[key], bool):
             errors.append(f"buy_block_inputs.{key} must be true/false after verification")
+    # Explicit null is permitted for these conditions only; absent keys are not.
+    for key in TRISTATE_BOOLEAN_KEYS:
+        if key not in inputs:
+            errors.append(f"buy_block_inputs.{key} is absent; verify explicitly")
+        elif inputs[key] is not None and not isinstance(inputs[key], bool):
+            errors.append(f"buy_block_inputs.{key} must be true/false/null")
+
     if "base_upside_pct" not in inputs:
-        errors.append("buy_block_inputs.base_upside_pct is absent; provide a value or explicit null")
+        errors.append("buy_block_inputs.base_upside_pct is absent; provide a finite numeric value")
     else:
         try:
             import math
+            if isinstance(inputs["base_upside_pct"], bool):
+                raise ValueError("boolean is not a numeric upside")
             value = float(inputs["base_upside_pct"])
             if not math.isfinite(value):
                 raise ValueError("not finite")
