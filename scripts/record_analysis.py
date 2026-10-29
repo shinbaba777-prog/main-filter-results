@@ -16,6 +16,7 @@ import json
 import sys
 from pathlib import Path
 from scoring_engine import evaluate
+from validate_block_inputs import validate_buy_block_inputs
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV_PATH = ROOT / "index.csv"
@@ -40,6 +41,13 @@ def main() -> int:
         if key not in payload:
             print(f"Missing required input field: {key}", file=sys.stderr)
             return 2
+
+    errors = validate_buy_block_inputs(payload["buy_block_inputs"])
+    if errors:
+        print("BUY-block input validation failed:", file=sys.stderr)
+        for error in errors:
+            print(f"- {error}", file=sys.stderr)
+        return 2
 
     result = evaluate(payload)
     stage1 = result["stage1"]
