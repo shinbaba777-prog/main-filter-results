@@ -55,6 +55,15 @@ def _sum_group(items: list[Item], group: str) -> dict[str, float]:
     return {"earned": earned, "missing": missing, "not_applicable": na,
             "available": available, "configured": configured}
 
+def tri_and(left: bool | None, right: bool | None) -> bool | None:
+    """Three-valued AND: False dominates; True requires two True values."""
+    if left is False or right is False:
+        return False
+    if left is True and right is True:
+        return True
+    return None
+
+
 def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
     """Evaluate score, Stage 1, final band and mandatory BUY blocks.
 
@@ -102,13 +111,15 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
         ("⑥ 空売り型Aかつ成長性7点以下または財務・CF4点以下",
          bool(b.get("short_type_a")) and
          (actual["growth"]["earned"] <= 7 or actual["finance_cf"]["earned"] <= 4)),
-        ("⑦ PEG＞2.0かつ業種相対PER＞130%", bool(b.get("peg_over_2")) and bool(b.get("industry_per_over_130"))),
+        ("⑦ PEG＞2.0かつ業種相対PER＞130%", tri_and(b.get("peg_over_2"), b.get("industry_per_over_130"))),
         ("⑧ Base想定上昇余地＋20%未満",
          b.get("base_upside_pct") is not None and float(b["base_upside_pct"]) < 20),
     ]
     # ROIC unavailable is a notice, not a block. No other metric is inferred.
-    blocks = [label for label, active in checks if active]
+    blocks = [label for label, active in checks if active is True]
     notices = []
+    if checks[6][1] is None:
+        notices.append("🚨 BUYブロック⑦は判定不能（PEG・業種相対PERのUNKNOWN。格下げには使わない）")
     if b.get("roic_unavailable"):
         notices.append("ROIC算出不能：BUYブロック④は判定不能（格下げに使用しない）")
     if stage1_insufficient:
