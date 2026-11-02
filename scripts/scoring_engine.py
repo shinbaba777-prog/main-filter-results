@@ -9,6 +9,7 @@ in the denominator. The upstream data collector must supply evidence/source fiel
 from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Any
+from validate_block_inputs import validate_buy_block_inputs
 
 STAGE1_GROUPS = {
     "growth": 15, "profitability": 15, "roic_capital": 15,
@@ -92,7 +93,7 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
     stage1_denominator = 80 - stage1_missing - stage1_na
     stage1_rate = (stage1_earned / stage1_denominator * 100) if stage1_denominator > 0 else None
     stage1_insufficient = stage1_missing > 16
-    stage1_pass = (not stage1_insufficient and stage1_rate is not None and stage1_rate >= 65 and stage1_earned >= 52)
+    stage1_pass = (not stage1_insufficient and stage1_rate is not None and stage1_rate >= 65)
 
     earned = sum(v["earned"] for v in actual.values())
     missing = sum(v["missing"] for v in actual.values())
@@ -102,6 +103,9 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
     adjusted = (earned / denominator * 100) if denominator > 0 and not total_insufficient else None
 
     b = payload.get("buy_block_inputs", {})
+    validation_errors = validate_buy_block_inputs(b)
+    if validation_errors:
+        raise ValueError("; ".join(validation_errors))
     checks = [
         ("① 空売り方向性0点", bool(b.get("shorts_direction_zero")) and bool(b.get("shorts_applicable", True))),
         ("② 営業CF÷純利益0点", bool(b.get("ocf_ni_zero"))),
@@ -112,9 +116,10 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
          bool(b.get("short_type_a")) and
          (actual["growth"]["earned"] <= 7 or actual["finance_cf"]["earned"] <= 4)),
         ("⑦ PEG＞2.0かつ業種相対PER＞130%", tri_and(b.get("peg_over_2"), b.get("industry_per_over_130"))),
-        ("⑧ Base想定上昇余地＋20%未満",
+        ("⑧ 適正株価の想定上昇余地＋20%未満",
          b.get("base_upside_pct") is not None and float(b["base_upside_pct"]) < 20),
     ]
+    # All BUY-block inputs must be source-verified before this point.
     # ROIC unavailable is a notice, not a block. No other metric is inferred.
     blocks = [label for label, active in checks if active is True]
     notices = []
