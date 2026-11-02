@@ -2,7 +2,7 @@
 """Validate mandatory BUY-block inputs without silently treating unknowns as false.
 
 Use this before scoring/recording. Booleans must be explicitly source-checked;
-base_upside_pct must be a finite numeric value so the +20% BUY-block condition
+fair_value_upside_pct must be a finite numeric value so the +20% BUY-block condition
 cannot silently pass while the Base scenario remains unassessed.
 """
 from __future__ import annotations
@@ -34,7 +34,7 @@ def validate_buy_block_inputs(inputs: object) -> list[str]:
         elif inputs[key] is not None and not isinstance(inputs[key], bool):
             errors.append(f"buy_block_inputs.{key} must be true/false/null")
 
-    if "base_upside_pct" not in inputs:
+    if "fair_value_upside_pct" not in inputs:
         errors.append("buy_block_inputs.base_upside_pct is absent; provide a finite numeric value")
     else:
         try:
