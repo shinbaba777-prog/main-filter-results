@@ -28,13 +28,41 @@ def growth_score(metrics: dict) -> list[dict]:
     out = []
     for key, label, maximum, thresholds in specs:
         value = metrics.get(key)
+        hold = _hold_reason(metrics, key)
         pts, status = band(value, thresholds)
-        if key == "operating_profit_long_cagr" and value is None and metrics.get("operating_profit_cagr_uncomputable"):
+        evidence = f"value={value!r}"
+        if hold:
+            # Data hold (e.g. 連結切替 inside the window): missing, never the
+            # nonpositive-CAGR fallback and never a number spliced across bases.
+            pts, status, evidence = None, "missing", f"保留: {hold}"
+        elif key == "operating_profit_long_cagr" and value is None and metrics.get("operating_profit_cagr_uncomputable"):
             pts = 1 if metrics.get("latest_operating_profit_positive") else 0
             status = "scored"
         out.append({"key": label, "group": "growth", "points": pts, "max_points": maximum,
-                    "status": status, "evidence": f"value={value!r}", "source": metrics.get(key+"_source","")})
+                    "status": status, "evidence": evidence, "source": metrics.get(key+"_source","")})
     return out
+
+
+HOLD_REASON_TEXT = {
+    "basis_change": "連結切替を含む期間のためCAGR保留（連結・個別をつながない）",
+    "basis_unknown": "連結・個別の区分が未確認のため保留",
+    "insufficient_periods": "期数不足",
+    "missing_value": "始点または終点が未取得",
+}
+
+
+def _hold_reason(metrics: dict, key: str) -> str:
+    """Return a non-empty explanation when a metric is held as missing.
+
+    The caller sets `<key>_hold_reason` from financial_metrics.basis_consistent_cagr
+    (any reason except "nonpositive"). Unknown reason strings are passed through.
+    """
+    reason = metrics.get(key + "_hold_reason")
+    if not reason or reason == "nonpositive":
+        return ""
+    if metrics.get(key) is not None:
+        raise ValueError(f"{key}: a held metric must not also carry a value")
+    return HOLD_REASON_TEXT.get(reason, str(reason))
 
 def profitability_score(metrics: dict) -> list[dict]:
     """5-2 Profitability (15). margins are decimals; margin_deltas are percentage-point differences."""
@@ -69,7 +97,11 @@ def eps_score(metrics: dict) -> list[dict]:
     ]
     for key,maximum,thresholds in specs:
         value=metrics.get(key)
+        hold=_hold_reason(metrics,key)
         pts,status=band(value,thresholds)
+        if hold:
+            out.append({"key":key,"group":"eps_growth","points":None,"max_points":maximum,"status":"missing","evidence":f"保留: {hold}","source":metrics.get(key+"_source","")})
+            continue
         if value is None and metrics.get(key+"_uncomputable") and key=="eps_long_cagr":
             pts=1 if metrics.get("latest_eps_positive") else 0; status="scored"
         if value is None and metrics.get(key+"_uncomputable") and key in ("eps_yoy","eps_forecast_growth"):
@@ -213,9 +245,19 @@ def shorts_supply_score(m: dict) -> list[dict]:
     return out
 
 def ir_reaction_score(m: dict) -> list[dict]:
-    target=m.get("target_ir_count_12m",0); eligible=m.get("eligible_ir_count_12m",0)
-    if target==0:
+    """5-10 IR reaction (5). Single definition (duplicate removed 2026-11-03).
+
+    An absent count is missing, not zero IRs: only an explicit 0 target count
+    makes the item not applicable.
+    """
+    target=m.get("target_ir_count_12m")
+    eligible=m.get("eligible_ir_count_12m")
+    if target is None:
+        p=None;s="missing";e="対象IR件数が未確認"
+    elif target==0:
         p=None;s="not_applicable";e="対象IRが直近12ヶ月ゼロ"
+    elif eligible is None:
+        p=None;s="missing";e="採点可能IR件数が未確認"
     elif eligible==0:
         p=None;s="missing";e="対象IRあり、成熟・非重複の採点可能IRなし"
     else:
@@ -282,24 +324,3 @@ def build_items(metrics: dict) -> list[dict]:
         else:
             items.extend(fn(data))
     return items
-
-
-# Override with strict evidence handling: absence of a count is missing, not zero IRs.
-def ir_reaction_score(m: dict) -> list[dict]:
-    target=m.get("target_ir_count_12m")
-    eligible=m.get("eligible_ir_count_12m")
-    if target is None:
-        p=None;s="missing";e="対象IR件数が未確認"
-    elif target==0:
-        p=None;s="not_applicable";e="対象IRが直近12ヶ月ゼロ"
-    elif eligible is None:
-        p=None;s="missing";e="採点可能IR件数が未確認"
-    elif eligible==0:
-        p=None;s="missing";e="対象IRあり、成熟・非重複の採点可能IRなし"
-    else:
-        total=0
-        for ret in m.get("eligible_excess_returns",[]):
-            total += 2 if ret>=.10 else 1 if ret>=.03 else 0 if ret>-.03 else -1 if ret>-.10 else -2
-        p=5 if total>=4 else 4 if total>=2 else 3 if total>=0 else 2 if total>=-2 else 1 if total>=-4 else 0
-        s="scored";e=f"eligible={eligible}; returns={m.get('eligible_excess_returns')!r}; adjustment_sum={total}"
-    return [{"key":"ir_reaction","group":"ir_reaction","points":p,"max_points":5,"status":s,"evidence":e,"source":m.get("source","")}]

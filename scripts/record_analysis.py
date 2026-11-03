@@ -62,6 +62,10 @@ def main() -> int:
             notes = (notes + "; " if notes else "") + "BUYブロック: " + "、".join(active)
     if result["notices"]:
         notes = (notes + "; " if notes else "") + "／".join(result["notices"])
+    basis = result.get("industry_per_basis")
+    if basis:
+        from industry_per import describe_selection
+        notes = (notes + "; " if notes else "") + describe_selection(basis)
     if result["data_status"] == "DATA-INSUFFICIENT":
         notes = (notes + "; " if notes else "") + f'欠損配点{total["missing_points"]}点; STAGE1欠損{stage1["missing_points"]}点'
     row = {
