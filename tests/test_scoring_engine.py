@@ -56,6 +56,22 @@ class ScoringEngineTests(unittest.TestCase):
         self.assertEqual(r["judgment"], "最大HOLD")
         self.assertTrue(next(x for x in r["buy_blocks"] if x["condition"].startswith("③"))["active"])
 
+    def test_buy_block_seven_three_valued_and_truth_table(self):
+        for peg in (True, False, None):
+            for industry in (True, False, None):
+                with self.subTest(peg=peg, industry=industry):
+                    r = evaluate(payload(points=100, blocks={
+                        "peg_over_2": peg, "industry_per_over_130": industry
+                    }))
+                    expected = (False if peg is False or industry is False else
+                                True if peg is True and industry is True else None)
+                    block = next(x for x in r["buy_blocks"]
+                                 if x["condition"].startswith("⑦"))
+                    self.assertIs(block["active"], expected)
+                    self.assertEqual(r["judgment"], "最大HOLD" if expected is True else "強いBUY")
+                    self.assertEqual(any("⑦は判定不能" in s for s in r["notices"]),
+                                     expected is None)
+
     def test_roic_unavailable_is_notice_not_block(self):
         r = evaluate(payload(points=100, blocks={"roic_unavailable": True}))
         self.assertEqual(r["judgment"], "強いBUY")

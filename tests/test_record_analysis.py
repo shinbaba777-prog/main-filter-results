@@ -73,6 +73,38 @@ class RecordAnalysisTests(unittest.TestCase):
             with target.open(encoding="utf-8", newline="") as f:
                 self.assertEqual(len(list(csv.DictReader(f))), 1)
 
+    def test_direct_record_entry_rejects_invalid_buy_block_inputs_without_writing(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            source = base / "analysis.json"
+            target = base / "index.csv"
+            data = payload()
+            data["buy_block_inputs"] = dict(BUY_BLOCKS)
+            data["buy_block_inputs"]["short_type_a"] = None
+            source.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            result = self.run_record(source, target)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("BUY-block input validation failed", result.stderr)
+            self.assertFalse(target.exists())
+
+    def test_direct_record_entry_preserves_unknown_block_seven(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            source = base / "analysis.json"
+            target = base / "index.csv"
+            data = payload()
+            data["buy_block_inputs"] = dict(BUY_BLOCKS)
+            data["buy_block_inputs"]["peg_over_2"] = None
+            data["buy_block_inputs"]["industry_per_over_130"] = True
+            source.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            result = self.run_record(source, target)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            with target.open(encoding="utf-8", newline="") as file:
+                rows = list(csv.DictReader(file))
+            self.assertEqual(len(rows), 1)
+            self.assertIn("⑦は判定不能", rows[0]["notes"])
+            self.assertEqual(rows[0]["judgment"], "強いBUY")
+
     def test_dry_run_does_not_create_csv(self):
         with tempfile.TemporaryDirectory() as td:
             base = Path(td)

@@ -1,0 +1,71 @@
+{
+ "code": "9554",
+ "company": "AViC",
+ "edinet_code": "E37744",
+ "retrieved": "2026-11-03",
+ "source": "EDINET DB get_financials (annual, XBRL of 有価証券報告書). docID per row; FY2021 report predates the DB's docID coverage.",
+ "notes": [
+  "basis: FY2021-FY2023 standalone, FY2024-FY2025 consolidated (連結切替 in FY2024; FY2024 standalone revenue 1,700,821,000 also disclosed).",
+  "operating_income: not returned for standalone years FY2021-FY2023 (kept None, not estimated).",
+  "treasury_shares_fye: treasuryEndPeriodHoldingCount (41/41/65/85). EDINET DB's treasurySharesCount is 0 (ai_extracted) and conflicts with it; the latest quarterly snapshot (2026-06-30) shows 85, so the end-period holding count is used. Primary-document confirmation in the 有報『自己株式等の状況』 is still required before scoring.",
+  "shares_issued_fye: sharesIssuedFiscalYearEnd (FY-end), not sharesIssued (filing date).",
+  "split_factor: EDINET DB splitAdjustmentFactor = 1.0 for all years, appliedCorporateActions = [] (no post-listing split confirmed)."
+ ],
+ "rows": [
+  {
+   "fiscal_year": 2021,
+   "basis": "standalone",
+   "revenue": 1329789000,
+   "operating_income": null,
+   "eps": 14.21,
+   "split_factor": 1.0,
+   "shares_issued_fye": null,
+   "treasury_shares_fye": null,
+   "doc_id": null
+  },
+  {
+   "fiscal_year": 2022,
+   "basis": "standalone",
+   "revenue": 1245789000,
+   "operating_income": null,
+   "eps": 40.54,
+   "split_factor": 1.0,
+   "shares_issued_fye": 5693100,
+   "treasury_shares_fye": 41,
+   "doc_id": "S100PVN5"
+  },
+  {
+   "fiscal_year": 2023,
+   "basis": "standalone",
+   "revenue": 1488596000,
+   "operating_income": null,
+   "eps": 38.15,
+   "split_factor": 1.0,
+   "shares_issued_fye": 5775300,
+   "treasury_shares_fye": 41,
+   "doc_id": "S100SJT6"
+  },
+  {
+   "fiscal_year": 2024,
+   "basis": "consolidated",
+   "revenue": 1934785000,
+   "operating_income": 446508000,
+   "eps": 50.56,
+   "split_factor": 1.0,
+   "shares_issued_fye": 6133500,
+   "treasury_shares_fye": 65,
+   "doc_id": "S100UZTW"
+  },
+  {
+   "fiscal_year": 2025,
+   "basis": "consolidated",
+   "revenue": 2680875000,
+   "operating_income": 724544000,
+   "eps": 87.18,
+   "split_factor": 1.0,
+   "shares_issued_fye": 6327800,
+   "treasury_shares_fye": 85,
+   "doc_id": "S100XC3I"
+  }
+ ]
+}

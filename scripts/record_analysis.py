@@ -16,6 +16,7 @@ import json
 import sys
 from pathlib import Path
 from scoring_engine import evaluate
+from validate_block_inputs import validate_buy_block_inputs
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV_PATH = ROOT / "index.csv"
@@ -41,6 +42,13 @@ def main() -> int:
             print(f"Missing required input field: {key}", file=sys.stderr)
             return 2
 
+    errors = validate_buy_block_inputs(payload["buy_block_inputs"])
+    if errors:
+        print("BUY-block input validation failed:", file=sys.stderr)
+        for error in errors:
+            print(f"- {error}", file=sys.stderr)
+        return 2
+
     result = evaluate(payload)
     stage1 = result["stage1"]
     stage1_text = (f'{stage1["raw_score"]:g}/80' if not stage1["insufficient"]
@@ -54,6 +62,10 @@ def main() -> int:
             notes = (notes + "; " if notes else "") + "BUYブロック: " + "、".join(active)
     if result["notices"]:
         notes = (notes + "; " if notes else "") + "／".join(result["notices"])
+    basis = result.get("industry_per_basis")
+    if basis:
+        from industry_per import describe_selection
+        notes = (notes + "; " if notes else "") + describe_selection(basis)
     if result["data_status"] == "DATA-INSUFFICIENT":
         notes = (notes + "; " if notes else "") + f'欠損配点{total["missing_points"]}点; STAGE1欠損{stage1["missing_points"]}点'
     row = {

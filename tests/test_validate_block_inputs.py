@@ -41,6 +41,34 @@ class BuyBlockInputValidationTests(unittest.TestCase):
         values["roic_below_h"] = True
         self.assertTrue(any("cannot both be true" in e for e in validate_buy_block_inputs(values)))
 
+    def test_explicit_unknown_peg_or_industry_per_is_accepted(self):
+        for key in ("peg_over_2", "industry_per_over_130"):
+            with self.subTest(key=key):
+                values = self.complete()
+                values[key] = None
+                self.assertEqual(validate_buy_block_inputs(values), [])
+
+    def test_missing_tristate_key_is_still_rejected(self):
+        for key in ("peg_over_2", "industry_per_over_130"):
+            with self.subTest(key=key):
+                values = self.complete()
+                del values[key]
+                self.assertTrue(any(f"{key} is absent" in e for e in validate_buy_block_inputs(values)))
+
+    def test_nontristate_null_and_non_boolean_tristate_are_rejected(self):
+        values = self.complete()
+        values["short_type_a"] = None
+        self.assertTrue(validate_buy_block_inputs(values))
+        values = self.complete()
+        values["peg_over_2"] = "unknown"
+        self.assertTrue(any("peg_over_2 must be true/false/null" in e
+                            for e in validate_buy_block_inputs(values)))
+
+    def test_boolean_upside_is_rejected(self):
+        values = self.complete()
+        values["base_upside_pct"] = True
+        self.assertTrue(validate_buy_block_inputs(values))
+
     def test_unassessed_scenario_is_rejected(self):
         values = self.complete()
         values["base_upside_pct"] = None

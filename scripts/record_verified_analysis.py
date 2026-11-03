@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Validated entry point for recording a 2.3.1 analysis payload.
 
-Requires explicit BUY-block inputs and a numeric, assessed Base-scenario upside.
+Requires explicit BUY-block inputs. The fair-value upside (base_upside_pct) must be a
+finite number, or an explicit null with fair_value_unavailable_reason (block ⑧ UNKNOWN).
 Usage: python3 scripts/record_verified_analysis.py payload.json [--dry-run]
 """
 from __future__ import annotations
 import json
-import math
 import sys
 from pathlib import Path
 from validate_block_inputs import validate_buy_block_inputs
@@ -37,18 +37,9 @@ def main() -> int:
             print(f"- {error}", file=sys.stderr)
         return 2
 
-    upside = payload["buy_block_inputs"].get("base_upside_pct")
-    try:
-        upside_number = float(upside)
-        if not math.isfinite(upside_number):
-            raise ValueError("not finite")
-    except (TypeError, ValueError):
-        print(
-            "Recording blocked: buy_block_inputs.base_upside_pct must be a finite number. "
-            "Assess the Base scenario first; null/unknown must not be treated as passing the +20% BUY block.",
-            file=sys.stderr,
-        )
-        return 2
+    # base_upside_pct: finite number, or explicit null + fair_value_unavailable_reason
+    # (already enforced by validate_buy_block_inputs). Null makes BUY block ⑧ UNKNOWN:
+    # it is recorded as a notice, never as a pass and never as a downgrade.
 
     # record_analysis parses the same payload path and optional --dry-run from argv.
     return record_analysis.main()

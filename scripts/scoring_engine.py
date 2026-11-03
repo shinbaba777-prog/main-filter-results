@@ -9,6 +9,7 @@ in the denominator. The upstream data collector must supply evidence/source fiel
 from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Any
+from validate_block_inputs import validate_buy_block_inputs
 
 STAGE1_GROUPS = {
     "growth": 15, "profitability": 15, "roic_capital": 15,
@@ -55,14 +56,57 @@ def _sum_group(items: list[Item], group: str) -> dict[str, float]:
     return {"earned": earned, "missing": missing, "not_applicable": na,
             "available": available, "configured": configured}
 
+def tri_and(left: bool | None, right: bool | None) -> bool | None:
+    """Three-valued AND: False dominates; True requires two True values."""
+    if left is False or right is False:
+        return False
+    if left is True and right is True:
+        return True
+    return None
+
+
+def tri_or(left: bool | None, right: bool | None) -> bool | None:
+    """Three-valued OR: True dominates; False requires two False values."""
+    if left is True or right is True:
+        return True
+    if left is False and right is False:
+        return False
+    return None
+
+
+def group_at_most(group_score: dict[str, float], limit: float) -> bool | None:
+    """Is a group's score <= limit, given that its missing points are unknown?
+
+    True only if the score stays <= limit even when every missing point is earned;
+    False if the score already exceeds limit; otherwise UNKNOWN. Not-applicable
+    points are outside the group's achievable range and are ignored.
+    """
+    earned = group_score["earned"]
+    if earned > limit:
+        return False
+    if earned + group_score["missing"] <= limit:
+        return True
+    return None
+
+
+def _upside_condition(b: dict[str, Any]) -> bool | None:
+    value = b.get("base_upside_pct")
+    if value is None:
+        return None
+    return float(value) < 20
+
+
 def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
     """Evaluate score, Stage 1, final band and mandatory BUY blocks.
 
     Required payload keys:
       items: list of item dicts
       buy_block_inputs: keys shorts_direction_zero, ocf_ni_zero, dilution_zero,
-        roic_below_h, roic_unavailable, short_type_a, peg_over_2,
-        industry_per_over_130, base_upside_pct
+        roic_below_h, roic_unavailable, short_type_a,
+        peg_over_2 / industry_per_over_130 (true/false/null), base_upside_pct
+        (finite number, or null with fair_value_unavailable_reason)
+      industry_per_selection (optional): record produced by
+        industry_per.select_industry_per(), echoed as industry_per_basis
     The 10 rubric group names must add up to their specification maximum.
     """
     items = [Item.from_dict(x) for x in payload.get("items", [])]
@@ -83,7 +127,7 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
     stage1_denominator = 80 - stage1_missing - stage1_na
     stage1_rate = (stage1_earned / stage1_denominator * 100) if stage1_denominator > 0 else None
     stage1_insufficient = stage1_missing > 16
-    stage1_pass = (not stage1_insufficient and stage1_rate is not None and stage1_rate >= 65 and stage1_earned >= 52)
+    stage1_pass = (not stage1_insufficient and stage1_rate is not None and stage1_rate >= 65)
 
     earned = sum(v["earned"] for v in actual.values())
     missing = sum(v["missing"] for v in actual.values())
@@ -93,6 +137,11 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
     adjusted = (earned / denominator * 100) if denominator > 0 and not total_insufficient else None
 
     b = payload.get("buy_block_inputs", {})
+    validation_errors = validate_buy_block_inputs(b)
+    if validation_errors:
+        raise ValueError("; ".join(validation_errors))
+    block6_weak_fundamentals = tri_or(group_at_most(actual["growth"], 7),
+                                      group_at_most(actual["finance_cf"], 4))
     checks = [
         ("① 空売り方向性0点", bool(b.get("shorts_direction_zero")) and bool(b.get("shorts_applicable", True))),
         ("② 営業CF÷純利益0点", bool(b.get("ocf_ni_zero"))),
@@ -100,17 +149,31 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
         ("④ ROIC＜基準資本コストH", bool(b.get("roic_below_h"))),
         ("⑤ 欠損配点20点超", total_insufficient),
         ("⑥ 空売り型Aかつ成長性7点以下または財務・CF4点以下",
-         bool(b.get("short_type_a")) and
-         (actual["growth"]["earned"] <= 7 or actual["finance_cf"]["earned"] <= 4)),
-        ("⑦ PEG＞2.0かつ業種相対PER＞130%", bool(b.get("peg_over_2")) and bool(b.get("industry_per_over_130"))),
-        ("⑧ Base想定上昇余地＋20%未満",
-         b.get("base_upside_pct") is not None and float(b["base_upside_pct"]) < 20),
+         tri_and(bool(b.get("short_type_a")), block6_weak_fundamentals)),
+        ("⑦ PEG＞2.0かつ業種相対PER＞130%", tri_and(b.get("peg_over_2"), b.get("industry_per_over_130"))),
+        ("⑧ 適正株価の想定上昇余地＋20%未満", _upside_condition(b)),
     ]
+    # All BUY-block inputs must be source-verified before this point.
     # ROIC unavailable is a notice, not a block. No other metric is inferred.
-    blocks = [label for label, active in checks if active]
+    # UNKNOWN (None) never downgrades and is never reported as "not applicable".
+    blocks = [label for label, active in checks if active is True]
+    unknown_blocks = [label for label, active in checks if active is None]
     notices = []
+    if checks[5][1] is None:
+        notices.append("🚨 BUYブロック⑥は判定不能（成長性・財務CFの欠損で7点以下／4点以下が確定できない。格下げには使わない）")
+    if checks[6][1] is None:
+        notices.append("🚨 BUYブロック⑦は判定不能（PEG・業種相対PERのUNKNOWN。格下げには使わない）")
+    if checks[7][1] is None:
+        notices.append("🚨 BUYブロック⑧は判定不能（適正株価が算定不能："
+                       f"{b.get('fair_value_unavailable_reason', '')}。格下げには使わない）")
     if b.get("roic_unavailable"):
         notices.append("ROIC算出不能：BUYブロック④は判定不能（格下げに使用しない）")
+    industry_per_basis = payload.get("industry_per_selection")
+    if industry_per_basis is not None:
+        from industry_per import validate_selection_record
+        selection_errors = validate_selection_record(industry_per_basis)
+        if selection_errors:
+            raise ValueError("; ".join(selection_errors))
     if stage1_insufficient:
         judgment = "STAGE1 DATA-INSUFFICIENT"
     elif not stage1_pass:
@@ -144,7 +207,11 @@ def evaluate(payload: dict[str, Any]) -> dict[str, Any]:
         "total": {"raw_score": earned, "max_score": 100, "missing_points": missing,
                   "not_applicable_points": na, "denominator": denominator,
                   "adjusted_score": adjusted, "insufficient": total_insufficient},
-        "buy_blocks": [{"condition": label, "active": active} for label, active in checks],
+        "buy_blocks": [{"condition": label, "active": active,
+                        "state": "TRUE" if active is True else "FALSE" if active is False else "UNKNOWN"}
+                       for label, active in checks],
+        "buy_blocks_unknown": unknown_blocks,
+        "industry_per_basis": industry_per_basis,
         "notices": notices,
         "judgment": judgment,
         "data_status": "DATA-INSUFFICIENT" if total_insufficient or stage1_insufficient else "CALCULATED",
