@@ -26,6 +26,22 @@ GitHub Actions の **EDINET API data refresh** が、EDINET API v2から提出�
 5. [構造監査サマリー](https://github.com/shinbaba777-prog/main-filter-results/blob/main/data/edinet/extracted/financial_metric_audit_summary.json)の警告とフラグを確認します。警告を解消できない値は「欠損/未確認」とし、推定で補いません。
 6. 公式開示と照合できた場合でも、株価・PER・業種比較・ROIC/WACC・空売り・希薄化など、メインフィルターが要求する他の情報を別途確認してから採点します。
 
+## 一括実行：収集から判定準備まで
+
+候補ブランチに **Main Filter 2.3.1 end-to-end data readiness** ワークフローを追加しました。GitHub の Actions でこのワークフローを選び、銘柄コード・会社名（任意）・履歴年数を指定して実行すると、次を一続きで行います。
+
+1. EDINET APIから提出書類を調査し、指定年数の有報CSV ZIPを取得
+2. XBRL CSV抽出、候補検査、主要指標レビューキュー生成
+3. 年次指標レビュー表の生成（スクリプトが存在する場合）
+4. 取得期間・欠落・失敗日・訂正報告・承認済み事実数を集計
+5. 「判定準備可／要レビュー」のJSON・Markdownレポートを作成し、成果物として保存
+
+実行画面：Actions → **Main Filter 2.3.1 end-to-end data readiness** → Run workflow。まず候補ブランチ `candidate/edinet-amendment-cache-fix` で実行してください。
+
+**重要な境界：** 一括実行はデータを集めて不足・未確認項目を明示するところまで自動化します。XBRL候補の自動承認、株価/PER・業種比較・JPX空売り・IR超過リターン・ROIC/WACC・シナリオの推測、正式スコア確定、`index.csv` の更新は行いません。これらを未検証のまま自動判定に流すのは、メインフィルター2.3.1の欠損ルールに反するためです。
+
+出力の `pipeline_readiness.md` と `pipeline_readiness.json` を確認し、正式判定がブロックされている場合は表示された未解決項目を先に解消してください。訂正報告が見つかった場合は原本を黙って置き換えず、元報告と訂正報告を照合します。
+
 ## 実行方法
 
 1. GitHubリポジトリの **Actions → EDINET API data refresh → Run workflow** を開きます。

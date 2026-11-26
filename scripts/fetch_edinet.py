@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import io
 import json
 import os
@@ -144,6 +145,90 @@ def write_json_atomic(path: Path, payload: object) -> None:
     atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
 
 
+CACHE_REFRESH_DAYS = 180
+CACHE_VERSION = 1
+CACHE_DIR = OUT / "listing_cache"
+
+def calendar_dates(start_day: date, end_day: date) -> list[date]:
+    """Return every calendar date in an inclusive range, including weekends."""
+    if end_day < start_day:
+        return []
+    result = []
+    day = start_day
+    while day <= end_day:
+        result.append(day)
+        day += timedelta(days=1)
+    return result
+
+class ListingCache:
+    """Validated deterministic gzip cache for successful date-scoped listings."""
+    def __init__(self, directory: Path, today: date, refresh_days: int = CACHE_REFRESH_DAYS):
+        self.directory, self.today, self.refresh_days = directory, today, refresh_days
+        self._years: dict[int, dict[str, list[dict]]] = {}
+        self._dirty: set[int] = set()
+
+    def _load_year(self, year: int) -> dict[str, list[dict]]:
+        if year in self._years:
+            return self._years[year]
+        path = self.directory / (str(year) + ".json.gz")
+        days: dict[str, list[dict]] = {}
+        if path.exists():
+            try:
+                with gzip.open(path, "rt", encoding="utf-8") as stream:
+                    payload = json.load(stream)
+                if isinstance(payload, dict) and payload.get("version") == CACHE_VERSION and isinstance(payload.get("days"), dict):
+                    for key, rows in payload["days"].items():
+                        try:
+                            parsed = date.fromisoformat(key)
+                        except (TypeError, ValueError):
+                            continue
+                        if parsed.year == year and isinstance(rows, list) and all(isinstance(row, dict) for row in rows):
+                            days[key] = rows
+            except (OSError, EOFError, gzip.BadGzipFile, json.JSONDecodeError):
+                days = {}
+        self._years[year] = days
+        return days
+
+    def get(self, day: date) -> list[dict] | None:
+        if (self.today - day).days < self.refresh_days:
+            return None
+        rows = self._load_year(day.year).get(day.isoformat())
+        return [dict(row) for row in rows] if rows is not None else None
+
+    def put(self, day: date, rows: list[dict]) -> None:
+        if (self.today - day).days < self.refresh_days:
+            return
+        if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+            raise EdinetError("listing cache: invalid row schema")
+        self._load_year(day.year)[day.isoformat()] = rows
+        self._dirty.add(day.year)
+
+    def save(self) -> None:
+        for year in sorted(self._dirty):
+            path = self.directory / (str(year) + ".json.gz")
+            payload = json.dumps({"version": CACHE_VERSION, "days": self._years[year]}, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            self.directory.mkdir(parents=True, exist_ok=True)
+            fd, temp_name = tempfile.mkstemp(prefix="." + str(year) + ".", suffix=".tmp", dir=self.directory)
+            try:
+                with os.fdopen(fd, "wb") as raw:
+                    with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as stream:
+                        stream.write(payload)
+                    raw.flush()
+                    os.fsync(raw.fileno())
+                os.replace(temp_name, path)
+            finally:
+                if os.path.exists(temp_name):
+                    os.unlink(temp_name)
+        self._dirty.clear()
+
+def fetch_listing_cached(day: date, api_key: str, cache: ListingCache) -> list[dict]:
+    cached = cache.get(day)
+    if cached is not None:
+        return cached
+    rows = fetch_listing(day, api_key)
+    cache.put(day, rows)
+    return rows
+
 def add_months(day: date, months: int) -> date:
     """Shift a date by calendar months, clamping the day to the target month."""
     month_index = day.month - 1 + months
@@ -167,16 +252,28 @@ def weekday_dates(start_day: date, end_day: date) -> list[date]:
 
 
 def filter_history_rows(rows: list[dict], accepted_codes: set[str]) -> list[dict]:
-    """Keep valid annual report originals and amendments for the requested issuer."""
-    return [
-        row for row in rows
-        if str(row.get("docTypeCode", "")) in ANNUAL_REPORT_CODES
-        and normalize_code(row.get("secCode")) in accepted_codes
-        and str(row.get("csvFlag", "")) == "1"
-        and str(row.get("legalStatus", "1")) in {"1", "2"}
-        and str(row.get("withdrawalStatus", "0")) not in {"1", "2"}
-        and str(row.get("docInfoEditStatus", "1")) != "2"
-    ]
+    """Keep live annual-report originals and amendments for the requested issuer.
+
+    Original annual reports require a downloadable CSV. Amendments remain visible even
+    when csvFlag=0, because text-only corrections still require human review.
+    """
+    kept = []
+    for row in rows:
+        doc_type = str(row.get("docTypeCode", ""))
+        if doc_type not in ANNUAL_REPORT_CODES:
+            continue
+        if normalize_code(row.get("secCode")) not in accepted_codes:
+            continue
+        if str(row.get("legalStatus", "1")) not in {"1", "2"}:
+            continue
+        if str(row.get("withdrawalStatus", "0")) in {"1", "2"}:
+            continue
+        if str(row.get("docInfoEditStatus", "1")) == "2":
+            continue
+        if doc_type == "120" and str(row.get("csvFlag", "")) != "1":
+            continue
+        kept.append(row)
+    return kept
 
 
 def write_metadata(rows: list[dict]) -> None:
@@ -193,6 +290,16 @@ def write_metadata(rows: list[dict]) -> None:
 def download_csv_zip(row: dict, api_key: str) -> Path:
     doc_id = str(row.get("docID") or "")
     if not DOC_RE.fullmatch(doc_id): raise EdinetError("Selected document has invalid docID")
+    code = normalize_code(row.get("secCode")) or "unknown"
+    path = OUT / f"{code}_{doc_id}_xbrl_csv.zip"
+    # Reuse an existing CRC-valid ZIP before making a network request.
+    if path.exists():
+        try:
+            with zipfile.ZipFile(path) as zf:
+                if zf.testzip() is None:
+                    return path
+        except (zipfile.BadZipFile, OSError):
+            pass
     response = api_get(f"documents/{doc_id}", {"type": "5"}, api_key, f"CSV download {doc_id}")
     if "json" in response.headers.get("Content-Type", "").lower():
         _, message = api_error(response)
@@ -204,14 +311,7 @@ def download_csv_zip(row: dict, api_key: str) -> Path:
         with zipfile.ZipFile(payload) as zf:
             if zf.testzip(): raise EdinetError(f"EDINET ZIP for {doc_id} failed CRC validation")
     except zipfile.BadZipFile: raise EdinetError(f"EDINET ZIP for {doc_id} is corrupt") from None
-    code = normalize_code(row.get("secCode")) or "unknown"
-    path = OUT / f"{code}_{doc_id}_xbrl_csv.zip"
     OUT.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        try:
-            with zipfile.ZipFile(path) as zf:
-                if zf.testzip() is None: return path
-        except (zipfile.BadZipFile, OSError): pass
     fd, temp_name = tempfile.mkstemp(prefix=".edinet-", suffix=".tmp", dir=OUT)
     try:
         with os.fdopen(fd, "wb") as f:
@@ -276,13 +376,14 @@ def main() -> int:
 
         end_day = today - timedelta(days=args.days)
         full_start_day = today - timedelta(days=365 * args.history_years + 120)
-        full_scan_days = weekday_dates(full_start_day, end_day)
+        full_scan_days = calendar_dates(full_start_day, end_day)
+        listing_cache = ListingCache(CACHE_DIR, today)
         historical_matches = []
         failed_days = []
         scanned_days = set()
 
         def fetch_historical_day(scan_day):
-            return scan_day, fetch_listing(scan_day, api_key)
+            return scan_day, fetch_listing_cached(scan_day, api_key, listing_cache)
 
         def scan_dates(days, label):
             fresh_days = [d for d in days if d not in scanned_days]
@@ -304,7 +405,7 @@ def main() -> int:
                         print(f"Warning: {label} listing request failed for {scan_day}: {type(exc).__name__}")
                     completed += 1
                     if completed % 100 == 0 or completed == len(fresh_days):
-                        print(f"{label} progress: {completed}/{len(fresh_days)} new weekday queries; {len(found)} matching filings found.", flush=True)
+                        print(f"{label} progress: {completed}/{len(fresh_days)} new calendar-day queries; {len(found)} matching filings found.", flush=True)
             return found, failed
 
         # The --days window is already queried above. Use it as the first attempt
@@ -384,6 +485,26 @@ def main() -> int:
                         retry_failed.append(failed_day)
                 failed_days = retry_failed
 
+        # A targeted scan can locate five filings without proving that the
+        # full date range was read. Complete the full calendar-day audit before
+        # any manifest can be marked complete.
+        if len(scanned_days) < len(full_scan_days):
+            found, failed = scan_dates(full_scan_days, "Full calendar-day verification")
+            historical_matches.extend(found)
+            failed_days.extend(failed)
+        if failed_days:
+            time.sleep(60)
+            retry_failed = []
+            for failed_day in sorted(set(failed_days)):
+                try:
+                    historical_matches.extend(filter_history_rows(fetch_listing_cached(failed_day, api_key, listing_cache), accepted_codes))
+                except (requests.RequestException, ValueError, RuntimeError):
+                    retry_failed.append(failed_day)
+            failed_days = retry_failed
+        listing_cache.save()
+        # Reconcile expected fiscal periods against the complete scan, not only
+        # the targeted passes, so manifest gaps reflect all retrieved listings.
+        missing_periods = periods_missing_from_scan()
         scan_days = sorted(scanned_days)
         print(f"Historical scan: {len(scan_days)} unique weekday queries; {len(failed_days)} failed after retry.");
         by_period = {}
@@ -408,10 +529,31 @@ def main() -> int:
             print(f"ERROR: no annual-report CSV filings found for securities code {code}.", file=sys.stderr)
             return 3
         print(f"Historical scan: {len(scan_days)} weekdays queried; {len(historical_matches)} matching records; {len(selected)} fiscal periods selected.", flush=True)
-        manifest = {"requested_code": code, "requested_periods": args.history_years, "status": "incomplete", "periods": [], "gaps": [], "failed_scan_dates": [d.isoformat() for d in failed_days], "amendments": []}
-        for row in historical_matches + matches:
-            if str(row.get("docTypeCode", "")) == "130":
-                manifest["amendments"].append({"docID": row.get("docID"), "parentDocID": row.get("parentDocID"), "periodEnd": row.get("periodEnd") or "", "status": "needs_review"})
+        manifest = {"requested_code": code, "requested_periods": args.history_years, "status": "incomplete", "periods": [], "gaps": [], "failed_scan_dates": [d.isoformat() for d in failed_days], "scan_range": {"start": full_start_day.isoformat(), "end": end_day.isoformat(), "calendar_days_expected": len(calendar_dates(full_start_day, end_day)), "calendar_days_scanned": len(scan_days)}, "missing_expected_periods": [], "amendments": []}
+        manifest["missing_expected_periods"] = [p.isoformat() for p in missing_periods]
+        selected_doc_ids = {str(row.get("docID")) for row in selected}
+        selected_period_ends = {str(row.get("periodEnd") or "") for row in selected}
+        issuer_rows = [row for row in historical_matches + matches if normalize_code(row.get("secCode")) in accepted_codes and str(row.get("legalStatus", "1")) in {"1", "2"} and str(row.get("withdrawalStatus", "0")) not in {"1", "2"} and str(row.get("docInfoEditStatus", "1")) != "2"]
+        amendment_rows = []
+        for row in issuer_rows:
+            if str(row.get("docTypeCode", "")) != "130":
+                continue
+            parent_id = str(row.get("parentDocID") or "")
+            period_end = str(row.get("periodEnd") or "")
+            if parent_id and parent_id not in selected_doc_ids:
+                continue
+            if not parent_id and period_end not in selected_period_ends:
+                continue
+            if parent_id and period_end and period_end not in selected_period_ends:
+                continue
+            amendment_rows.append(row)
+        seen_amendments = set()
+        for row in amendment_rows:
+            doc_id = str(row.get("docID") or "")
+            if not doc_id or doc_id in seen_amendments:
+                continue
+            seen_amendments.add(doc_id)
+            manifest["amendments"].append({"docID": doc_id, "parentDocID": row.get("parentDocID") or "", "periodEnd": row.get("periodEnd") or "", "status": "needs_review"})
         downloaded = 0
         for row in reversed(selected):
             item = {"periodEnd": row.get("periodEnd") or "", "docID": row.get("docID"), "status": "missing", "reason": ""}
@@ -433,16 +575,23 @@ def main() -> int:
                     manifest["gaps"].append({"from": left, "to": right, "reason": "period_gap_over_400_days"})
             except ValueError:
                 manifest["gaps"].append({"from": left, "to": right, "reason": "invalid_period_end"})
-        if failed_days or downloaded < len(selected) or manifest["gaps"]:
+        # A successful scan is not sufficient if the requested number of fiscal
+        # periods is missing. Never label an unexplained short history as complete.
+        expected_calendar_days = len(calendar_dates(full_start_day, end_day))
+        full_scan_verified = not failed_days and len(scan_days) == expected_calendar_days
+        all_selected_downloaded = downloaded == len(selected)
+        if not full_scan_verified or not all_selected_downloaded or manifest["gaps"]:
             manifest["status"] = "incomplete"
-        elif len(selected) == args.history_years:
-            manifest["status"] = "complete"
-        else:
-            # Fewer periods can be legitimate for a newly listed issuer only when
-            # the scan itself succeeded and the periods show no unexplained gap.
+        elif len(selected) < args.history_years:
+            # A shorter history can be valid for a newly listed issuer, but only
+            # after every calendar day was audited and any missing periods recorded.
             manifest["status"] = "complete_short_history"
+        elif manifest["amendments"]:
+            manifest["status"] = "complete_with_amendments"
+        else:
+            manifest["status"] = "complete"
         OUT.mkdir(parents=True, exist_ok=True)
-        (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        write_json_atomic(OUT / "download_manifest.json", manifest)
         print(json.dumps({"download_manifest": manifest}, ensure_ascii=False), flush=True)
         if manifest["status"] == "incomplete": return 3
     elif args.download_csv:
@@ -452,7 +601,7 @@ def main() -> int:
         if not matches:
             OUT.mkdir(parents=True, exist_ok=True)
             manifest = {"requested_code": code, "requested_periods": 1, "status": "incomplete", "periods": [], "gaps": [], "failed_scan_dates": [], "amendments": [], "reason": "no_matching_filing_in_recent_window"}
-            (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(OUT / "download_manifest.json", manifest)
             print(f"No downloadable annual-report CSV found for securities code {code} in the last {args.days} days.")
             return 3
         matches.sort(key=lambda r: r.get("submitDateTime", ""), reverse=True)
@@ -464,14 +613,44 @@ def main() -> int:
                         "periods": [{"periodEnd": matches[0].get("periodEnd") or "", "docID": matches[0].get("docID"),
                                      "status": "missing", "reason": type(exc).__name__}],
                         "gaps": [], "failed_scan_dates": [], "amendments": []}
-            (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(OUT / "download_manifest.json", manifest)
             print(f"ERROR: latest CSV download failed ({type(exc).__name__}); API key and URL redacted.", file=sys.stderr)
             return 3
-        manifest = {"requested_code": code, "requested_periods": 1, "status": "complete",
-                    "periods": [{"periodEnd": matches[0].get("periodEnd") or "", "docID": matches[0].get("docID"),
+        selected_row = matches[0]
+        selected_doc_id = str(selected_row.get("docID") or "")
+        selected_period_end = str(selected_row.get("periodEnd") or "")
+        amendments = []
+        seen_amendments = set()
+        for row in rows:
+            if str(row.get("docTypeCode", "")) != "130":
+                continue
+            if normalize_code(row.get("secCode")) not in accepted_codes:
+                continue
+            if str(row.get("legalStatus", "1")) not in {"1", "2"}:
+                continue
+            if str(row.get("withdrawalStatus", "0")) in {"1", "2"}:
+                continue
+            if str(row.get("docInfoEditStatus", "1")) == "2":
+                continue
+            parent_id = str(row.get("parentDocID") or "")
+            period_end = str(row.get("periodEnd") or "")
+            if parent_id and parent_id != selected_doc_id:
+                continue
+            if not parent_id and period_end != selected_period_end:
+                continue
+            if period_end and period_end != selected_period_end:
+                continue
+            doc_id = str(row.get("docID") or "")
+            if not doc_id or doc_id in seen_amendments:
+                continue
+            seen_amendments.add(doc_id)
+            amendments.append({"docID": doc_id, "parentDocID": parent_id, "periodEnd": period_end, "status": "needs_review"})
+        manifest = {"requested_code": code, "requested_periods": 1,
+                    "status": "complete_with_amendments" if amendments else "complete",
+                    "periods": [{"periodEnd": selected_period_end, "docID": selected_doc_id,
                                  "status": "downloaded", "file": path.name}],
-                    "gaps": [], "failed_scan_dates": [], "amendments": []}
-        (OUT / "download_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+                    "gaps": [], "failed_scan_dates": [], "amendments": amendments}
+        write_json_atomic(OUT / "download_manifest.json", manifest)
         print(f"Downloaded latest matching XBRL CSV ZIP: {path}")
 
     write_metadata(rows)
